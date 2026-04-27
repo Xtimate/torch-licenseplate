@@ -17,7 +17,7 @@ print(f"Using device: {device}")
 def ctc_decode(output):
     """Greedy CTC decode — collapse repeats and remove blank (last index)."""
     blank = len(CHARS) - 1
-    pred = output.argmax(dim=2).squeeze(1).tolist()  # [T]
+    pred = output.argmax(dim=2).squeeze(1).tolist()
     result = []
     prev = None
     for p in pred:
@@ -28,13 +28,6 @@ def ctc_decode(output):
 
 
 def collate_fn(batch):
-    """
-    Custom collate to handle variable-length labels.
-    Returns:
-        imgs:           [B, C, H, W]
-        labels_flat:    1-D tensor of all label indices concatenated
-        target_lengths: [B] actual label length per sample
-    """
     imgs, labels = zip(*batch)
     imgs = torch.stack(imgs)
     target_lengths = torch.tensor([len(l) for l in labels], dtype=torch.long)
@@ -43,6 +36,10 @@ def collate_fn(batch):
 
 
 if __name__ == "__main__":
+    os.makedirs("checkpoints", exist_ok=True)
+    checkpoint_path = os.path.abspath("checkpoints/lprnet.pth")
+    best_checkpoint_path = os.path.abspath("checkpoints/lprnet_best.pth")
+
     model = LPRNet(num_chars=len(CHARS)).to(device)
     dataset = LicensePlateDataset(size=10000)
     dataloader = DataLoader(
@@ -59,16 +56,16 @@ if __name__ == "__main__":
         optimizer, patience=3, factor=0.5
     )
 
-    checkpoint_path = os.path.abspath("checkpoints/lprnet.pth")
     print(checkpoint_path)
-    print(os.path.exists(checkpoint_path))
     if os.path.exists(checkpoint_path):
         model.load_state_dict(
             torch.load(checkpoint_path, map_location=device), strict=False
         )
         print("Loaded existing checkpoint")
 
-    for epoch in range(50):
+    best_loss = float("inf")
+
+    for epoch in range(100):
         model.train()
         total_loss = 0
 
@@ -80,7 +77,7 @@ if __name__ == "__main__":
             target_lengths = target_lengths.to(device)
 
             optimizer.zero_grad()
-            outputs = model(imgs)  # [T, B, num_chars]
+            outputs = model(imgs)
             log_probs = torch.log_softmax(outputs, dim=2)
             input_lengths = torch.full(
                 (imgs.size(0),), outputs.size(0), dtype=torch.long, device=device
@@ -98,6 +95,12 @@ if __name__ == "__main__":
             f"Epoch {epoch + 1} loss: {avg_loss:.4f}  lr: {optimizer.param_groups[0]['lr']:.6f}"
         )
 
+        # --- Save best checkpoint ---
+        if avg_loss < best_loss:
+            best_loss = avg_loss
+            torch.save(model.state_dict(), best_checkpoint_path)
+            print(f"  ★ New best ({best_loss:.4f}) -> checkpoints/lprnet_best.pth")
+
         # --- Per-epoch sample decode (5 plates) ---
         model.eval()
         with torch.no_grad():
@@ -114,6 +117,7 @@ if __name__ == "__main__":
                 correct += predicted == expected
             print(f"  Sample accuracy: {correct}/5")
 
-    os.makedirs("checkpoints", exist_ok=True)
     torch.save(model.state_dict(), checkpoint_path)
-    print("Model saved to checkpoints/lprnet.pth")
+    print(f"\nTraining complete.")
+    print(f"  Final model : {checkpoint_path}")
+    print(f"  Best model  : {best_checkpoint_path}  (loss {best_loss:.4f})")
