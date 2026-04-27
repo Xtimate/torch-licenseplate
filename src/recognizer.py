@@ -27,7 +27,8 @@ class LPRNet(nn.Module):
             nn.ReLU(),
             nn.Dropout2d(0.25),
         )
-        self.classifier = nn.Conv2d(256, num_chars, kernel_size=1, stride=1, padding=0)
+
+        self.classifier = nn.Conv2d(256, num_chars, kernel_size=1)
 
     def forward(self, x):
         x = self.conv1(x)

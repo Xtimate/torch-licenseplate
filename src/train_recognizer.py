@@ -7,49 +7,113 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset import CHARS, LicensePlateDataset
+from dataset import CHARS, LicensePlateDataset, idx_to_char
 from recognizer import LPRNet
 
-if __name__ == "__main__":
-    model = LPRNet(num_chars=len(CHARS))
-    dataset = LicensePlateDataset(size=10000, country="NL")
-    dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=4)
-    loss_fn = nn.CTCLoss(blank=len(CHARS) - 1)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
-    if os.path.exists("checkpoints/lprnet.pth"):
-        model.load_state_dict(torch.load("checkpoints/lprnet.pth"))
+
+def ctc_decode(output):
+    """Greedy CTC decode — collapse repeats and remove blank (last index)."""
+    blank = len(CHARS) - 1
+    pred = output.argmax(dim=2).squeeze(1).tolist()  # [T]
+    result = []
+    prev = None
+    for p in pred:
+        if p != prev and p != blank:
+            result.append(idx_to_char[p])
+        prev = p
+    return "".join(result)
+
+
+def collate_fn(batch):
+    """
+    Custom collate to handle variable-length labels.
+    Returns:
+        imgs:           [B, C, H, W]
+        labels_flat:    1-D tensor of all label indices concatenated
+        target_lengths: [B] actual label length per sample
+    """
+    imgs, labels = zip(*batch)
+    imgs = torch.stack(imgs)
+    target_lengths = torch.tensor([len(l) for l in labels], dtype=torch.long)
+    labels_flat = torch.tensor([idx for l in labels for idx in l], dtype=torch.long)
+    return imgs, labels_flat, target_lengths
+
+
+if __name__ == "__main__":
+    model = LPRNet(num_chars=len(CHARS)).to(device)
+    dataset = LicensePlateDataset(size=10000)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=128,
+        shuffle=True,
+        num_workers=8,
+        pin_memory=True,
+        collate_fn=collate_fn,
+    )
+    loss_fn = nn.CTCLoss(blank=len(CHARS) - 1, zero_infinity=True)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, patience=3, factor=0.5
+    )
+
+    checkpoint_path = os.path.abspath("checkpoints/lprnet.pth")
+    print(checkpoint_path)
+    print(os.path.exists(checkpoint_path))
+    if os.path.exists(checkpoint_path):
+        model.load_state_dict(
+            torch.load(checkpoint_path, map_location=device), strict=False
+        )
         print("Loaded existing checkpoint")
 
     for epoch in range(50):
+        model.train()
         total_loss = 0
-        for batch in tqdm(dataloader, desc=f"Epoch {epoch + 1}"):
-            inputs, labels = batch
-            labels = torch.stack(labels, dim=1).view(-1)
+
+        for imgs, labels_flat, target_lengths in tqdm(
+            dataloader, desc=f"Epoch {epoch + 1}"
+        ):
+            imgs = imgs.to(device)
+            labels_flat = labels_flat.to(device)
+            target_lengths = target_lengths.to(device)
+
             optimizer.zero_grad()
-            outputs = model(inputs)
+            outputs = model(imgs)  # [T, B, num_chars]
             log_probs = torch.log_softmax(outputs, dim=2)
             input_lengths = torch.full(
-                (inputs.size(0),), outputs.size(0), dtype=torch.long
+                (imgs.size(0),), outputs.size(0), dtype=torch.long, device=device
             )
-            target_lengths = torch.full((inputs.size(0),), 8, dtype=torch.long)
-            loss = loss_fn(log_probs, labels, input_lengths, target_lengths)
+
+            loss = loss_fn(log_probs, labels_flat, input_lengths, target_lengths)
             loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
             optimizer.step()
             total_loss += loss.item()
-        scheduler.step()  # once per epoch
-        print(f"Epoch {epoch + 1} loss: {total_loss / len(dataloader):.4f}")
+
+        avg_loss = total_loss / len(dataloader)
+        scheduler.step(avg_loss)
+        print(
+            f"Epoch {epoch + 1} loss: {avg_loss:.4f}  lr: {optimizer.param_groups[0]['lr']:.6f}"
+        )
+
+        # --- Per-epoch sample decode (5 plates) ---
+        model.eval()
+        with torch.no_grad():
+            correct = 0
+            print("  Samples:")
+            for i in range(5):
+                img, label = dataset[i]
+                out = model(img.unsqueeze(0).to(device))
+                out = torch.log_softmax(out, dim=2)
+                predicted = ctc_decode(out)
+                expected = "".join([idx_to_char[c] for c in label])
+                match = "✓" if predicted == expected else "✗"
+                print(f"    [{match}] predicted: {predicted:<12} expected: {expected}")
+                correct += predicted == expected
+            print(f"  Sample accuracy: {correct}/5")
 
     os.makedirs("checkpoints", exist_ok=True)
-    torch.save(model.state_dict(), "checkpoints/lprnet.pth")
+    torch.save(model.state_dict(), checkpoint_path)
     print("Model saved to checkpoints/lprnet.pth")
-
-    model.eval()
-    with torch.no_grad():
-        sample_img, sample_label = dataset[0]
-        output = model(sample_img.unsqueeze(0))
-        output = torch.log_softmax(output, dim=2)
-        pred = output.argmax(dim=2).squeeze(1).tolist()
-        print("Predicted:", pred)
-        print("Expected:", sample_label)
