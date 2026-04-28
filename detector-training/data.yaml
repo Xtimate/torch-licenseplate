@@ -1,13 +1,12 @@
-train: ../train/images
-val: ../valid/images
-test: ../test/images
-
+names:
+- LicensePlate
 nc: 1
-names: ['LicensePlate']
-
 roboflow:
-  workspace: xtimates-workspace
-  project: xtimates-workspace
-  version: dataset
   license: Private
+  project: xtimates-workspace
   url: https://app.roboflow.com/xtimates-workspace/xtimates-workspace/dataset
+  version: dataset
+  workspace: xtimates-workspace
+test: /home/xtimate/Documents/License-Plate-Torch/detector-training/train/images
+train: /home/xtimate/Documents/License-Plate-Torch/detector-training/train/images
+val: /home/xtimate/Documents/License-Plate-Torch/detector-training/train/images
