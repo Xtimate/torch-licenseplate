@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['LicensePlate']
+
+roboflow:
+  workspace: xtimates-workspace
+  project: xtimates-workspace
+  version: dataset
+  license: Private
+  url: https://app.roboflow.com/xtimates-workspace/xtimates-workspace/dataset
