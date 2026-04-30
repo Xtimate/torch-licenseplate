@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 import dataset
 import detector as det_module
@@ -30,6 +31,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(detect.router)
 app.include_router(recognize.router)
 app.include_router(pipeline.router)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/health")

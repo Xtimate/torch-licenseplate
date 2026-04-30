@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>LPRNet Pipeline</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <header>
+            <h1>LPRNet Pipeline</h1>
+        </header>
+
+        <nav>
+            <a href="#" class="active" data-section="pipeline">Pipeline</a>
+            <a href="#" data-section="detect">Detect</a>
+            <a href="#" data-section="recognize">Recognize</a>
+        </nav>
+
+        <main>
+            <section id="pipeline" class="active">
+                <h2>Pipeline</h2>
+                <div class="card">
+                    <label
+                        >Image
+                        <input type="file" id="pipeline-file" accept="image/*"
+                    /></label>
+                    <button onclick="runPipeline()">Run</button>
+                    <div class="result" id="pipeline-result"></div>
+                </div>
+            </section>
+
+            <section id="detect">
+                <h2>Detect plates</h2>
+                <div class="card">
+                    <label
+                        >Image
+                        <input type="file" id="detect-file" accept="image/*"
+                    /></label>
+                    <button onclick="runDetect()">Detect</button>
+                    <div class="result" id="detect-result"></div>
+                </div>
+            </section>
+
+            <section id="recognize">
+                <h2>Recognize plate</h2>
+                <div class="card">
+                    <label
+                        >Cropped plate image
+                        <input type="file" id="recognize-file" accept="image/*"
+                    /></label>
+                    <button onclick="runRecognize()">Recognize</button>
+                    <div class="result" id="recognize-result"></div>
+                </div>
+            </section>
+        </main>
+
+        <script src="app.js"></script>
+    </body>
+</html>
