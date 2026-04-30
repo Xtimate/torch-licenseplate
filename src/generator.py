@@ -134,7 +134,7 @@ def generate_plate(text, country="NL"):
 
     img = Image.new("RGB", (520, 110), color=bg_color)
     font = ImageFont.truetype(
-        "/home/xtimate/Documents/torch-licenseplate/fonts/CharlesWright-Bold.otf", 72
+        "/home/xtimate/Documents/License-Plate-Torch/fonts/Kenteken.ttf", 72
     )
     font_small = ImageFont.truetype(
         "/usr/share/fonts/liberation/LiberationSans-Bold.ttf", 16

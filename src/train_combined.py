@@ -47,7 +47,7 @@ def encode_real(text):
 
 
 class RealPlatesDataset(Dataset):
-    def __init__(self, root, augment_times=20):
+    def __init__(self, root, augment_times=200):
         self.augment_times = augment_times
         self.samples = []
 

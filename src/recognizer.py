@@ -63,6 +63,7 @@ def load_recognizer(num_chars, model_path, device):
     model.load_state_dict(
         torch.load(model_path, map_location=device, weights_only=True)
     )
+    model.to(device)
     model.eval()
     return model
 

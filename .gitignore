@@ -11,3 +11,4 @@ detector-training/
 !checkpoints/lprnet_best.pth
 venv/
 *.zip
+.env
