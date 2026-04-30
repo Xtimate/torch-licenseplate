@@ -18,24 +18,26 @@ from recognizer import LPRNet
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-REAL_PLATES_DIR = "/content/drive/MyDrive/license-plate-training/labeled_plates/eu-license-plates/eu"
+REAL_PLATES_DIR = "data/real-plates/eu-license-plates/eu"
 AUGMENT_TIMES = 20  # each real plate repeated 20x with augmentation
 
 
 # ── Real plates dataset ────────────────────────────────────────────────────────
 
-real_aug = A.Compose([
-    A.Rotate(limit=5, p=0.5),
-    A.GaussianBlur(blur_limit=(3, 7), p=0.5),
-    A.GaussNoise(p=0.5),
-    A.RandomBrightnessContrast(p=0.7),
-    A.HueSaturationValue(p=0.3),
-    A.Perspective(scale=(0.02, 0.05), p=0.4),
-    A.Downscale(scale_min=0.5, scale_max=0.9, p=0.3),
-    A.Sharpen(p=0.3),
-    A.ImageCompression(compression_type="jpeg", quality=(60, 95), p=0.3),
-    A.MotionBlur(blur_limit=5, p=0.3),
-])
+real_aug = A.Compose(
+    [
+        A.Rotate(limit=5, p=0.5),
+        A.GaussianBlur(blur_limit=(3, 7), p=0.5),
+        A.GaussNoise(p=0.5),
+        A.RandomBrightnessContrast(p=0.7),
+        A.HueSaturationValue(p=0.3),
+        A.Perspective(scale=(0.02, 0.05), p=0.4),
+        A.Downscale(scale_min=0.5, scale_max=0.9, p=0.3),
+        A.Sharpen(p=0.3),
+        A.ImageCompression(compression_type="jpeg", quality=(60, 95), p=0.3),
+        A.MotionBlur(blur_limit=5, p=0.3),
+    ]
+)
 
 
 def encode_real(text):
@@ -62,7 +64,9 @@ class RealPlatesDataset(Dataset):
                     continue
                 self.samples.append((os.path.join(folder, fname), encoded))
 
-        print(f"✅ Real plates: {len(self.samples)} unique → {len(self.samples) * augment_times} augmented")
+        print(
+            f"✅ Real plates: {len(self.samples)} unique → {len(self.samples) * augment_times} augmented"
+        )
 
     def __len__(self):
         return len(self.samples) * self.augment_times
@@ -82,6 +86,7 @@ class RealPlatesDataset(Dataset):
 
 # ── Collate ────────────────────────────────────────────────────────────────────
 
+
 def collate_fn(batch):
     imgs, labels = zip(*batch)
     imgs = torch.stack(imgs)
@@ -91,6 +96,7 @@ def collate_fn(batch):
 
 
 # ── CTC decode ─────────────────────────────────────────────────────────────────
+
 
 def ctc_decode(output):
     blank = len(CHARS) - 1
@@ -109,7 +115,7 @@ if __name__ == "__main__":
     os.makedirs("checkpoints", exist_ok=True)
     checkpoint_path = os.path.abspath("checkpoints/lprnet.pth")
     best_checkpoint_path = os.path.abspath("checkpoints/lprnet_best.pth")
-    drive_best = "/content/drive/MyDrive/license-plate-training/checkpoints/lprnet_best.pth"
+    drive_best = None
 
     # ── Datasets ───────────────────────────────────────────────────────────────
     synthetic = LicensePlateDataset(size=50000, data_dir="data/plates")
@@ -133,11 +139,15 @@ if __name__ == "__main__":
     model = LPRNet(num_chars=len(CHARS)).to(device)
     loss_fn = nn.CTCLoss(blank=len(CHARS) - 1, zero_infinity=True)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, factor=0.5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, patience=3, factor=0.5
+    )
 
     # Load existing checkpoint if available
     if os.path.exists(checkpoint_path):
-        model.load_state_dict(torch.load(checkpoint_path, map_location=device), strict=False)
+        model.load_state_dict(
+            torch.load(checkpoint_path, map_location=device), strict=False
+        )
         print("▶ Resumed from existing checkpoint")
 
     best_loss = float("inf")
@@ -147,7 +157,9 @@ if __name__ == "__main__":
         model.train()
         total_loss = 0
 
-        for imgs, labels_flat, target_lengths in tqdm(dataloader, desc=f"Epoch {epoch + 1}"):
+        for imgs, labels_flat, target_lengths in tqdm(
+            dataloader, desc=f"Epoch {epoch + 1}"
+        ):
             imgs = imgs.to(device)
             labels_flat = labels_flat.to(device)
             target_lengths = target_lengths.to(device)
@@ -167,13 +179,16 @@ if __name__ == "__main__":
 
         avg_loss = total_loss / len(dataloader)
         scheduler.step(avg_loss)
-        print(f"Epoch {epoch + 1:03d} | loss: {avg_loss:.4f} | lr: {optimizer.param_groups[0]['lr']:.6f}")
+        print(
+            f"Epoch {epoch + 1:03d} | loss: {avg_loss:.4f} | lr: {optimizer.param_groups[0]['lr']:.6f}"
+        )
 
         # Save best checkpoint locally + to Drive
         if avg_loss < best_loss:
             best_loss = avg_loss
             torch.save(model.state_dict(), best_checkpoint_path)
-            torch.save(model.state_dict(), drive_best)
+            if drive_best:
+                torch.save(model.state_dict(), drive_best)
             print(f"  ★ New best ({best_loss:.4f}) saved locally + to Drive")
 
         # Per-epoch sample decode on 5 synthetic plates
@@ -193,7 +208,7 @@ if __name__ == "__main__":
             print(f"  Sample accuracy: {correct}/5")
 
     torch.save(model.state_dict(), checkpoint_path)
-    torch.save(model.state_dict(), "/content/drive/MyDrive/license-plate-training/checkpoints/lprnet_final.pth")
+
     print(f"\nTraining complete.")
     print(f"  Final : {checkpoint_path}")
     print(f"  Best  : {best_checkpoint_path}  (loss {best_loss:.4f})")
