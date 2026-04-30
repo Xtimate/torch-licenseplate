@@ -1,8 +1,13 @@
 import os
 import sys
 
+import torch
 import torch.nn as nn
+from torchvision.transforms.functional import to_tensor
 
+from dataset import CHARS, idx_to_char
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sys.path.insert(0, os.path.dirname(__file__))
 
 
@@ -38,3 +43,34 @@ class LPRNet(nn.Module):
         x = x.mean(dim=(2))
         x = x.permute(2, 0, 1)
         return x
+
+
+def ctc_decode(output):
+    """Greedy CTC decode on a [T, 1, num_chars] log-prob tensor."""
+    blank = len(CHARS) - 1
+    pred = output.argmax(dim=2).squeeze(1).tolist()
+    result = []
+    prev = None
+    for p in pred:
+        if p != prev and p != blank:
+            result.append(idx_to_char[p])
+        prev = p
+    return "".join(result)
+
+
+def load_recognizer(num_chars, model_path, device):
+    model = LPRNet(num_chars)
+    model.load_state_dict(
+        torch.load(model_path, map_location=device, weights_only=True)
+    )
+    model.eval()
+    return model
+
+
+def recognize_from_image(image, model, device):
+    img = image.resize((188, 48)).convert("RGB")
+    tensor = to_tensor(img).unsqueeze(0).to(device)
+    with torch.no_grad():
+        output = model(tensor)
+        log_probs = torch.log_softmax(output, dim=2)
+        return ctc_decode(log_probs)
