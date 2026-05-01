@@ -23,3 +23,9 @@ def detect_from_image(model, image: Image.Image, conf: float = 0.3):
             }
         )
     return detections
+
+
+def load_detector_onnx(model_path: str):
+    from ultralytics import YOLO
+
+    return YOLO(model_path, task="detect")

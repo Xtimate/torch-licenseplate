@@ -1,6 +1,8 @@
 import os
 import sys
 
+import numpy as np
+import onnxruntime as ort
 import torch
 import torch.nn as nn
 from torchvision.transforms.functional import to_tensor
@@ -75,3 +77,23 @@ def recognize_from_image(image, model, device):
         output = model(tensor)
         log_probs = torch.log_softmax(output, dim=2)
         return ctc_decode(log_probs)
+
+
+def load_recognizer_onnx(model_path: str):
+    return ort.InferenceSession(model_path)
+
+
+def recognize_from_image_onnx(image, session):
+    img = image.resize((188, 48)).convert("RGB")
+    tensor = to_tensor(img).unsqueeze(0).numpy()
+    output = session.run(None, {"input": tensor})[0]
+    # CTC decode
+    blank = len(CHARS) - 1
+    pred = output.argmax(axis=2).squeeze(1).tolist()
+    result = []
+    prev = None
+    for p in pred:
+        if p != prev and p != blank:
+            result.append(idx_to_char[p])
+        prev = p
+    return "".join(result)

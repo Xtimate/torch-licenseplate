@@ -1,7 +1,7 @@
 from PIL import Image
 
 from detector import detect_from_image
-from recognizer import recognize_from_image
+from recognizer import recognize_from_image_onnx
 
 
 def run_pipeline(detector, recognizer, image: Image.Image, device):
@@ -9,7 +9,10 @@ def run_pipeline(detector, recognizer, image: Image.Image, device):
     results = []
     for det in detections:
         crop = image.crop((det["x1"], det["y1"], det["x2"], det["y2"]))
-        text = recognize_from_image(crop, recognizer, device)
+        text = recognize_from_image_onnx(
+            crop,
+            recognizer,
+        )
         results.append(
             {
                 "text": text,

@@ -14,14 +14,14 @@ import detector as det_module
 import recognizer as rec_module
 from api.config import CONF_THRESHOLD, DETECTOR_WEIGHTS, DEVICE, RECOGNIZER_WEIGHTS
 from api.routers import detect, pipeline, recognize
+from src.detector import load_detector_onnx
+from src.recognizer import load_recognizer_onnx
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.detector = det_module.load_detector(DETECTOR_WEIGHTS)
-    app.state.recognizer = rec_module.load_recognizer(
-        len(dataset.CHARS), RECOGNIZER_WEIGHTS, DEVICE
-    )
+    app.state.detector = load_detector_onnx("onnx/detector_best.onnx")
+    app.state.recognizer = load_recognizer_onnx("onnx/lprnet.onnx")
     app.state.device = DEVICE
     app.state.conf = CONF_THRESHOLD
     yield

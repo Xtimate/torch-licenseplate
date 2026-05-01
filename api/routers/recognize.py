@@ -15,7 +15,5 @@ router = APIRouter()
 async def recognize(request: Request, file: UploadFile = File(...)):
     contents = await file.read()
     image = Image.open(io.BytesIO(contents)).convert("RGB")
-    text = recognizer.recognize_from_image(
-        image, request.app.state.recognizer, request.app.state.device
-    )
+    text = recognizer.recognize_from_image_onnx(image, request.app.state.recognizer)
     return {"text": text}
