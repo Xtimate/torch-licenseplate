@@ -1,0 +1,11 @@
+venv/
+data/
+runs/
+sample_plates/
+spotter-ui/
+checkpoints/
+*.pth
+*.pt
+__pycache__/
+*.pyc
+.git/

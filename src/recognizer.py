@@ -1,5 +1,7 @@
 import os
 import sys
+from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 import onnxruntime as ort
@@ -11,6 +13,17 @@ from dataset import CHARS, idx_to_char
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sys.path.insert(0, os.path.dirname(__file__))
+
+BLANK = len(CHARS) - 1
+
+
+@dataclass
+class RecognitionResult:
+    text: str
+    confidence: float
+    char_confidences: list
+    rejected: bool
+    rejection_reason: Optional[str] = None
 
 
 class LPRNet(nn.Module):
@@ -47,17 +60,25 @@ class LPRNet(nn.Module):
         return x
 
 
-def ctc_decode(output):
-    """Greedy CTC decode on a [T, 1, num_chars] log-prob tensor."""
-    blank = len(CHARS) - 1
-    pred = output.argmax(dim=2).squeeze(1).tolist()
-    result = []
+def _softmax(x: np.ndarray) -> np.ndarray:
+    e = np.exp(x - x.max(axis=-1, keepdims=True))
+    return e / e.sum(axis=-1, keepdims=True)
+
+
+def _greedy_ctc(probs: np.ndarray, blank: int) -> tuple:
+    """probs: softmaxed [T, num_chars]"""
+    chars, confs = [], []
     prev = None
-    for p in pred:
-        if p != prev and p != blank:
-            result.append(idx_to_char[p])
-        prev = p
-    return "".join(result)
+    for t in range(probs.shape[0]):
+        token = int(np.argmax(probs[t]))
+        peak = float(probs[t, token])
+        if token != prev or token == BLANK:
+            prev = token
+            continue
+        chars.append(idx_to_char[token])
+        confs.append(peak)
+        prev = token
+    return "".join(chars), confs
 
 
 def load_recognizer(num_chars, model_path, device):
@@ -83,17 +104,31 @@ def load_recognizer_onnx(model_path: str):
     return ort.InferenceSession(model_path)
 
 
-def recognize_from_image_onnx(image, session):
+def recognize_from_image_onnx(
+    image, session, threshold: float = 0.7
+) -> RecognitionResult:
     img = image.resize((188, 48)).convert("RGB")
     tensor = to_tensor(img).unsqueeze(0).numpy()
-    output = session.run(None, {"input": tensor})[0]
-    # CTC decode
-    blank = len(CHARS) - 1
-    pred = output.argmax(axis=2).squeeze(1).tolist()
-    result = []
-    prev = None
-    for p in pred:
-        if p != prev and p != blank:
-            result.append(idx_to_char[p])
-        prev = p
-    return "".join(result)
+    print(
+        f"tensor shape: {tensor.shape}, min: {tensor.min():.3f}, max: {tensor.max():.3f}"
+    )
+    logits = session.run(None, {"input": tensor})[0]  # [T, 1, num_chars]
+    print(
+        f"logits shape: {logits.shape}, min: {logits.min():.3f}, max: {logits.max():.3f}"
+    )
+    print(f"raw argmax: {logits.argmax(axis=2).squeeze().tolist()}")
+    probs = _softmax(logits[:, 0, :])  # [T, num_chars]
+    print(f"top tokens: {np.argmax(probs, axis=1).tolist()}")
+    blank = logits.shape[2] - 1  # last token is blank
+    text, char_confs = _greedy_ctc(probs, blank)
+
+    if not char_confs:
+        return RecognitionResult("", 0.0, [], True, "empty_output")
+
+    confidence = float(np.mean(char_confs))
+    rejected = confidence < threshold
+    reason = (
+        f"confidence {confidence:.3f} below threshold {threshold}" if rejected else None
+    )
+
+    return RecognitionResult(text, confidence, char_confs, rejected, reason)

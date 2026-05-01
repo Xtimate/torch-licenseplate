@@ -6,6 +6,8 @@ import onnxruntime as ort
 from PIL import Image
 from torchvision.transforms.functional import to_tensor
 
+from src.recognizer import recognize_from_image_onnx
+
 sys.path.insert(0, "src")
 from dataset import CHARS, idx_to_char
 
@@ -24,15 +26,10 @@ def ctc_decode(output):
 
 
 def run(image_path):
-    # Load image
     img = Image.open(image_path).convert("RGB").resize((188, 48))
-    tensor = to_tensor(img).unsqueeze(0).numpy()
-
-    # LPRNet inference
-    sess = ort.InferenceSession("onnx/lprnet.onnx")
-    output = sess.run(None, {"input": tensor})[0]
-    text = ctc_decode(output)
-    print(f"Recognized: {text}")
+    session = ort.InferenceSession("onnx/lprnet.onnx")
+    result = recognize_from_image_onnx(img, session, threshold=0.7)
+    print(result)
 
 
 if __name__ == "__main__":

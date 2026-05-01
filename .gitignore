@@ -17,3 +17,6 @@ venv/
 .DS_Store
 *.zip
 .env
+
+.wakatime*
+wakatime.cfg
