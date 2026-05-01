@@ -13,7 +13,7 @@ import dataset
 import detector as det_module
 import recognizer as rec_module
 from api.config import CONF_THRESHOLD, DETECTOR_WEIGHTS, DEVICE, RECOGNIZER_WEIGHTS
-from api.routers import detect, pipeline, recognize, video
+from api.routers import detect, pipeline, recognize, video, webcam
 from src.detector import load_detector_onnx
 from src.recognizer import load_recognizer_onnx
 
@@ -32,6 +32,8 @@ app.include_router(detect.router)
 app.include_router(recognize.router)
 app.include_router(pipeline.router)
 app.include_router(video.router)
+app.include_router(webcam.router)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
