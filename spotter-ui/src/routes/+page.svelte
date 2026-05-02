@@ -2,7 +2,8 @@
     import { fade } from "svelte/transition";
     import { onDestroy } from "svelte";
 
-    const API_BASE = "http://localhost:8000";
+    const API_BASE = import.meta.env.VITE_API_BASE;
+    const WS_BASE = import.meta.env.VITS_API_BASE.replace("http", "ws");
     let activeTab = $state("pipeline");
     let pipelineFile: File | null = $state(null);
     let detectFile: File | null = $state(null);
@@ -27,7 +28,7 @@
         webcamActive = true;
         webcamResults = [];
 
-        ws = new WebSocket(`ws://localhost:8000/webcam`);
+        ws = new WebSocket(`${WS_BASE}/webcam`);
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.length > 0) {
