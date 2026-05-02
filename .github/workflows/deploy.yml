@@ -12,8 +12,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: cd spotter-ui && npm install
-      - run: cd spotter-ui && echo "API=$VITE_API_BASE" npm run build
+      - name: Install
+        run: cd spotter-ui && npm install
+      - name: Build
+        run: |
+          cd spotter-ui
+          npm run build
         env:
           VITE_API_BASE: http://167.172.42.12:8000
       - uses: peaceiris/actions-gh-pages@v3
