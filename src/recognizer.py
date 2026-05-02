@@ -110,6 +110,7 @@ def load_recognizer(num_chars, model_path, device):
 
 def recognize_from_image(image, model, device):
     img = image.resize((188, 48)).convert("RGB")
+    img.save("/tmp/debug_crop.jpg")
     tensor = to_tensor(img).unsqueeze(0).to(device)
     with torch.no_grad():
         output = model(tensor)
