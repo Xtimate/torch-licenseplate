@@ -4,7 +4,7 @@ from src.dataset import CHARS
 from src.recognizer import LPRNet
 
 model = LPRNet(num_chars=len(CHARS))
-model.load_state_dict(torch.load("checkpoints/lprnet_best_charleswright.pth"))
+model.load_state_dict(torch.load("checkpoints/lprnet_best.pth"))
 model.eval()
 
 dummy = torch.randn(1, 3, 48, 188)
