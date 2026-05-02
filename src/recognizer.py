@@ -150,8 +150,16 @@ def recognize_from_image_onnx(
     reason = (
         f"confidence {confidence:.3f} below threshold {threshold}" if rejected else None
     )
-
-    return RecognitionResult(text, confidence, char_confs, rejected, reason)
+    valid_format, country = validate_format(text)
+    return RecognitionResult(
+        text=text,
+        confidence=confidence,
+        char_confidences=char_confs,
+        rejected=rejected,
+        rejection_reason=reason,
+        valid_format=valid_format,
+        country=country,
+    )
 
 
 def is_duplicate(text: str, seen: set[str], max_distance: int = 2) -> bool:

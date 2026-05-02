@@ -1,7 +1,6 @@
 import io
 import os
 import sys
-from typing import List
 
 from fastapi import APIRouter, File, Request, UploadFile
 from PIL import Image

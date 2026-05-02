@@ -1,65 +1,24 @@
 # Spotter
 
-> Real-time license plate detection and recognition - built for Macondo.
+> Real-time license plate detection and recognition — built for Macondo.
 
-**[Live Demo →](https://xtimate.github.io/torch-licenseplate/)**
+**[Live Demo →](https://xtimate.github.io/torch-licenseplate/)** · **[Documentation →](https://github.com/Xtimate/torch-licenseplate/wiki)**
 
 ---
 
 ## What is it?
 
-Spotter is an end-to-end license palte recognition system built from scratch. It combines a YOLOv8 detector with a custom-trained LPRNet recognizer, both exported to ONNX and server via a FastAPI backend. A SvelteKit frontend lets you test it in real time -- upload an image, scan a video, or point your webcam at a plate.
-
-No cloud APIs. No off-the-shelf OCR. Just a model trained on a mix of synthetic and real Dutch, German and French plates rendered with realistic augmentation.
+Spotter is an end-to-end license plate recognition system built from scratch. It combines a YOLOv8 detector with a custom-trained LPRNet recognizer, both exported to ONNX and served via a FastAPI backend. A SvelteKit frontend lets you test it in real time — upload an image, scan a video, or point your webcam at a plate.
 
 ---
 
-## Features
+## Quick start
 
-- **Plate detection** via YOLOv8 (ONNX)
-- **Text recognition** via custom LPRNet (ONNX)
-- **Confidence scoring** - low-confidence results are rejected instead of returning garbage.
-- **Fuzzy deduplication** - catches near-duplicates like '13BSRB' vs 'I3BSRB' using Levenshtein distance
-- **Format validation** - recognizes and validates NL, DE and FR plate formats
-- **Batch endpoint** - process multiple images in one request
-- **Video scanning** - extract all unique plates across frames with the Levenshtein algorithm.
-- **Live webcam** - real-time detection via WebSocket
-
----
-
-## Stack
-
-| Layer | Tech |
-|---|---|
-| Detection | YOLOv8 → ONNX Runtime |
-| Recognition | Custom LPRNet → ONNX Runtime |
-| Backend | FastAPI → Python |
-| Frontend | SvelteKit + Tailwind |
-| Training data | Synthetic plates via Pillow + Albumentations |
-| Deployment | GitHub Pages + DigitalOcean
-
----
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|---|---|---
-| `POST` | `/pipeline` | Detect + recognize in one shot |
-| `POST` | `/detect` | Detection only, returns bounding boxes |
-| `POST` | `/recognize` | Recognition only on a cropped plate |
-| `POST` | `/pipeline/batch` | Process multiple images at once |
-| `POST` | `/video` | Scan a video file for unique plates |
-| `WS` | `/webcam` | Live webcam stream |
-| `GET` | `/health` | Health check |
-
----
-
-## Running locally
-```bash
 **Backend**
+```bash
 git clone https://github.com/Xtimate/torch-licenseplate.git
 cd torch-licenseplate
-python -m venv venv && source venv/bin/activate # if you use a shell other than bash, look for the correct activate script in the bin folder, for example for fish: activate.fish
+python -m venv venv && source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 PYTHONPATH=src uvicorn api.main:app --reload
 ```
@@ -73,135 +32,4 @@ npm install && npm run dev
 
 ---
 
-## Training your own model
-
-Generate the dataset:
-```bash
-python src/generate_dataset.py --size 20000 --out data/plates --workers 8 #adjust the size to your likings, a minimum of 20000 images is recommended for the best results, if --workers 8 doesnt work, change it to 4 or 2 workers.
-```
-
-Train:
-```bash
-PYTHONPATH=src python src/train_recognizer.py
-```
-
-Export to ONNX:
-```bash
-python export_onnx.py
-```
-
----
-
-## Project structure
-
-```
-torch-licenseplate/
-├── api/               # FastAPI app and routers
-├── src/               # Dataset, generator, recognizer, detector
-├── spotter-ui/        # SvelteKit frontend
-├── onnx/              # Exported ONNX models
-├── checkpoints/       # PyTorch checkpoints
-└── detector-training/ # YOLOv8 training config
-```
-
----
-
-Built for **Macondo** - a HackClub project.
-
-# For AMD GPU (ROCm) users
-
-If PyTorch isn't detecting your AMD GPU, you may need to override the GFX version to match the closest supported architecture:
-
-```bash
-export HSA_OVERRIDE_GFX_VERSION=10.3.0 # adjust for your GPU
-```
-
-Common values:
-| GPU Series | Value |
-|---|---|
-| RX 6000 (RDNA 2) | `10.3.0` |
-| RX 5000 (RDNA 1) | `10.1.0` |
-| RX Vega | `9.0.0` |
-
-To make it permanent, add it to your `~/.bashrc` or `~/.zshrc`.
-
-> **Note:** Check [ROCm's hardware compatibility list](https://rocm.docs.amd.com/en/latest/compatibility/compatibility-matrix.html) for your exact GPU.
-
-# Development
-
-## Adding a new country's plate format
-
-Plate format validation lives in `src/recognizer.py`. To add a new country, add its regex patterns to the relevant list and update 'validate_format':
-
-```python
-BE_PATTERNS = [
-    r"^[0-9][A-Z]{3}[0-9]{3}$",  # 1-ABC-123
-]
-AT_PATTERNS = [
-    r"^[A-Z]{1,2}\d{1,4}[A-Z]{1,2}$",           # AB 123456
-]
-```
-
-Then add them to `validate_format`:
-```python
-for pattern in BE_PATTERNS:
-  if re.match(pattern, text):
-    return True, "BE"
-for pattern in AT_PATTERNS:
-  if re.match(pattern, text):
-    return True, "AT"
-```
-
-You'll also want to add training data for the new formats in `src/generator.py` - add the format strings to the relevant `_FORMATS` list and make sure the characters are covered by 'CHARS' in `src/dataset.py`.
-
----
-
-## Known limitations
-
-**Real photo generalization**
-
-The recognizer was trained on a mix of synthetic plates generated by `src/generator.py` and augmented real plate images. Despite this, the model can still struggle with real photographs, especially when the plate isn't tightly cropped, the lighting is harsh, or the font differs significantly from the training data.
-
-Symptoms: The model outputs all blank tokens, returning an empty string with 0.0 confidence.
-
-**Suggested fixes:**
-- Add more real plate crops to the training set, diversity matters more than volume
-- Ensure the YOLO detector crops tightly to the plate before passing to the recognizer, loose crops with background context confuses the model.
-- Apply stronger augmentation, increase perspective distortion range, add more aggresive brightness shifts.
-- Fine-tune periodically as you collect more real-world samples.
-
----
-
-## Contributing
-
-Contributions are welcome. A few areas where help would be appreciated:
-
-- **More plate formats** - especially BE (Belgium) and AT (Austria), but any European format is useful.
-- **Real training data** - if you have acess to labeled plate images, open an issue.
-- **Model improvements** - better architecture, attention mechanisms or transformer-based recognizers.
-- **Frontend features** - batch upload UI, result history, export to CSV.
-
-To contribute:
-1. Fork the repo
-2. Create a branch (`git checkout -b feature/your-feature`)
-3. Make your changes
-4. Open a pull request with a clear discription of what you changed and why
-
-Please don't open PRs that add dependencies without discussion first.
-
----
-
-## How the WebSocket loop works
-
-The frontend captures a frame from the webcam every 500ms, encodes it as a JPEG blob, and sends it over a WebSocket connection to `/webcam`. The backend decodes the blob, runs detection and recognition, and sends back a JSON array of results. The frontend deduplicates results client-side by checking if the plate text already exists in `webcamResults`.
-
-Note that the backend also deduplicates using fuzzy matching across the session — so even if `13BSRB` and `I3BSRB` appear in different frames, only one will be returned.
-
----
-
-## Pointing the frontend at a different backend
-
-In development the frontend reads `VITE_API_BASE` from `spotter-ui/.env.development`:
-`VITE_API_BASE=http://localhost:8000`
-
-For production builds (GitHub Actions) it's injected as an environment variable in the workflow. To point at a different backend, either update `.env.development` locally or update the `VITE_API_BASE` value in `.github/workflows/deploy.yaml`.
+Built for **Macondo** — a Hackclub project.
