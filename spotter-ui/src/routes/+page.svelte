@@ -128,6 +128,7 @@
         detectResult = await post("/detect", detectFile);
     }
     async function runRecognize() {
+        console.log("running recognize");
         recognizeResult = await post("/recognize", recognizeFile);
         console.log("recognizeResult", recognizeResult);
     }
