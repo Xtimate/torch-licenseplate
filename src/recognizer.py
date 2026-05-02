@@ -93,9 +93,8 @@ def _greedy_ctc(probs: np.ndarray, blank: int) -> tuple:
         token = int(np.argmax(probs[t]))
         peak = float(probs[t, token])
         if token != prev or token == BLANK:
-            prev = token
-            continue
-        chars.append(idx_to_char[token])
+            chars.append(idx_to_char[token])
+        prev = token
         confs.append(peak)
         prev = token
     return "".join(chars), confs
