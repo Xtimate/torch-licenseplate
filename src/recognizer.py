@@ -119,6 +119,7 @@ def recognize_from_image(image, model, device):
 
 
 def load_recognizer_onnx(model_path: str):
+    print(f"loading model from {os.path.abspath(model_path)}")
     return ort.InferenceSession(model_path)
 
 
