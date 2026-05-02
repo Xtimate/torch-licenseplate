@@ -86,16 +86,14 @@ def _softmax(x: np.ndarray) -> np.ndarray:
 
 
 def _greedy_ctc(probs: np.ndarray, blank: int) -> tuple:
-    """probs: softmaxed [T, num_chars]"""
     chars, confs = [], []
     prev = None
     for t in range(probs.shape[0]):
         token = int(np.argmax(probs[t]))
         peak = float(probs[t, token])
-        if token != prev or token == BLANK:
+        if token != prev and token != blank:
             chars.append(idx_to_char[token])
-        prev = token
-        confs.append(peak)
+            confs.append(peak)
         prev = token
     return "".join(chars), confs
 
