@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 
@@ -35,13 +36,19 @@ def collate_fn(batch):
     return imgs, labels_flat, target_lengths
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--data-dir", type=str, default="data/plates")
+parser.add_argument("--epochs", type=int, default=100)
+parser.add_argument("--size", type=int, default=21250)
+args = parser.parse_args()
+
 if __name__ == "__main__":
     os.makedirs("checkpoints", exist_ok=True)
     checkpoint_path = os.path.abspath("checkpoints/lprnet.pth")
     best_checkpoint_path = os.path.abspath("checkpoints/lprnet_best.pth")
 
     model = LPRNet(num_chars=len(CHARS)).to(device)
-    dataset = LicensePlateDataset(size=21325, data_dir="data/mixed")
+    dataset = LicensePlateDataset(size=args.size, data_dir=args.data_dir)
     print(f"Loaded {len(dataset)} images from data/plates")
     dataloader = DataLoader(
         dataset,
@@ -66,7 +73,7 @@ if __name__ == "__main__":
 
     best_loss = float("inf")
 
-    for epoch in range(100):
+    for epoch in range(args.epochs):
         model.train()
         total_loss = 0
 

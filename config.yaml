@@ -1,0 +1,16 @@
+runtime: onnx
+
+models:
+  detector: onnx/detector_best.onnx
+  recognizer: onnx/lprnet.onnx
+  detector_pt: checkpoints/detector_best.pt
+  recognizer_pt: checkpoints/lprnet_best.pth
+
+inference:
+  device: cpu
+  conf_threshold: 0.3
+
+training:
+  data_dir: data/mixed
+  batch_size: 128
+  lr: 0.001
