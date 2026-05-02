@@ -129,6 +129,7 @@
     }
     async function runRecognize() {
         recognizeResult = await post("/recognize", recognizeFile);
+        console.log("recognizeResult", recognizeResult);
     }
     async function runVideo() {
         videoResult = await post("/video", videoFile);
@@ -216,6 +217,7 @@
                                     >Batch</span
                                 >
                                 <button
+                                    aria-label="Toggle batch mode"
                                     onclick={() => {
                                         batchMode = !batchMode;
                                         batchResult = null;
