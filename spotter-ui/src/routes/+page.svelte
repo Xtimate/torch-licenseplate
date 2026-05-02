@@ -5,6 +5,9 @@
     const API_BASE = import.meta.env.VITE_API_BASE;
     const WS_BASE = import.meta.env.VITE_API_BASE.replace("http", "ws");
     let activeTab = $state("pipeline");
+    let batchMode = $state(false);
+    let batchFiles: File[] = $state([]);
+    let batchResult: any = $state(null);
     let pipelineFile: File | null = $state(null);
     let detectFile: File | null = $state(null);
     let recognizeFile: File | null = $state(null);
@@ -55,6 +58,24 @@
                 0.8,
             );
         }, 500);
+    }
+
+    async function runBatch() {
+        if (!batchFiles.length) return;
+        loading = true;
+        const form = new FormData();
+        for (const file of batchFiles) form.append("files", file);
+        try {
+            const res = await fetch(`${API_BASE}/pipeline/batch`, {
+                method: "POST",
+                body: form,
+            });
+            batchResult = await res.json();
+        } catch (e: any) {
+            batchResult = { error: e.message };
+        } finally {
+            loading = false;
+        }
     }
 
     function stopWebcam() {
@@ -170,40 +191,65 @@
             >
                 {#if activeTab === "pipeline"}
                     <div class="space-y-6">
-                        <div>
-                            <p
-                                class="text-[10px] tracking-[3px] text-white/30 uppercase mb-1"
-                            >
-                                Mode
-                            </p>
-                            <h2
-                                class="text-xl font-bold"
-                                style="font-family: 'Syne', sans-serif;"
-                            >
-                                Full Pipeline
-                            </h2>
-                            <p class="text-white/30 text-xs mt-1">
-                                Detect plates in an image and recognize all text
-                                in one shot.
-                            </p>
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p
+                                    class="text-[10px] tracking-[3px] text-white/30 uppercase mb-1"
+                                >
+                                    Mode
+                                </p>
+                                <h2
+                                    class="text-xl font-bold"
+                                    style="font-family: 'Syne', sans-serif;"
+                                >
+                                    Full Pipeline
+                                </h2>
+                                <p class="text-white/30 text-xs mt-1">
+                                    {batchMode
+                                        ? "Process multiple images at once."
+                                        : "Detect plates in an image and recognize all text in one shot."}
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span
+                                    class="text-[10px] text-white/30 uppercase tracking-widest"
+                                    >Batch</span
+                                >
+                                <button
+                                    onclick={() => {
+                                        batchMode = !batchMode;
+                                        batchResult = null;
+                                        pipelineResult = null;
+                                    }}
+                                    class="w-10 h-5 rounded-full transition-colors relative {batchMode
+                                        ? 'bg-[#e8c84a]'
+                                        : 'bg-white/10'}"
+                                >
+                                    <span
+                                        class="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all {batchMode
+                                            ? 'left-5'
+                                            : 'left-0.5'}"
+                                    ></span>
+                                </button>
+                            </div>
                         </div>
 
-                        <label
-                            class="block border border-dashed border-white/10 rounded-lg p-8 text-center cursor-pointer hover:border-[#e8c84a]/40 transition-colors group"
-                        >
-                            <input
-                                type="file"
-                                accept="image/*"
-                                class="hidden"
-                                onchange={(e) => handleFile(e, "pipeline")}
-                            />
-                            {#if previewUrl}
-                                <img
-                                    src={previewUrl}
-                                    alt="preview"
-                                    class="max-h-48 mx-auto rounded mb-3 object-contain"
+                        {#if batchMode}
+                            <label
+                                class="block border border-dashed border-white/10 rounded-lg p-8 text-center cursor-pointer hover:border-[#e8c84a]/40 transition-colors group"
+                            >
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    class="hidden"
+                                    onchange={(e) => {
+                                        batchFiles = Array.from(
+                                            (e.target as HTMLInputElement)
+                                                .files ?? [],
+                                        );
+                                    }}
                                 />
-                            {:else}
                                 <div
                                     class="text-white/20 group-hover:text-white/40 transition-colors"
                                 >
@@ -211,60 +257,221 @@
                                     <div
                                         class="text-[11px] tracking-widest uppercase"
                                     >
-                                        Drop image or click
+                                        {batchFiles.length
+                                            ? `${batchFiles.length} files selected`
+                                            : "Select multiple images"}
                                     </div>
                                 </div>
-                            {/if}
-                            {#if pipelineFile}<p
-                                    class="text-[10px] text-white/30 mt-2"
-                                >
-                                    {pipelineFile.name}
-                                </p>{/if}
-                        </label>
+                            </label>
 
-                        <button
-                            onclick={runPipeline}
-                            disabled={!pipelineFile || loading}
-                            class="w-full py-3 bg-[#e8c84a] text-[#0a0a0a] text-[11px] tracking-[3px] uppercase font-bold rounded disabled:opacity-30 hover:bg-[#f0d060] transition-colors"
-                        >
-                            {loading ? "Running..." : "Run Pipeline"}
-                        </button>
-
-                        {#if pipelineResult}
-                            <div
-                                class="border border-white/5 rounded-lg overflow-hidden"
+                            <button
+                                onclick={runBatch}
+                                disabled={!batchFiles.length || loading}
+                                class="w-full py-3 bg-[#e8c84a] text-[#0a0a0a] text-[11px] tracking-[3px] uppercase font-bold rounded disabled:opacity-30 hover:bg-[#f0d060] transition-colors"
                             >
+                                {loading ? "Processing..." : "Run Batch"}
+                            </button>
+
+                            {#if batchResult}
                                 <div
-                                    class="px-4 py-2 bg-white/3 border-b border-white/5 text-[10px] tracking-widest text-white/30 uppercase"
+                                    class="border border-white/5 rounded-lg overflow-hidden"
                                 >
-                                    Result
-                                </div>
-                                {#if Array.isArray(pipelineResult) && pipelineResult.length > 0}
-                                    <div class="p-4 space-y-2">
-                                        {#each pipelineResult as det}
-                                            <div
-                                                class="flex items-center justify-between bg-white/3 rounded px-4 py-3"
-                                            >
-                                                <span
-                                                    class="text-[#e8c84a] font-bold tracking-widest text-lg"
-                                                    style="font-family: 'Syne', sans-serif;"
-                                                    >{det.text}</span
+                                    <div
+                                        class="px-4 py-2 bg-white/3 border-b border-white/5 text-[10px] tracking-widest text-white/30 uppercase"
+                                    >
+                                        Batch Results
+                                    </div>
+                                    <div class="p-4 space-y-4">
+                                        {#each batchResult as group}
+                                            <div>
+                                                <p
+                                                    class="text-[10px] text-white/30 uppercase tracking-widest mb-2"
                                                 >
-                                                <span
-                                                    class="text-[10px] text-white/30"
-                                                    >conf {(
-                                                        det.conf * 100
-                                                    ).toFixed(0)}%</span
-                                                >
+                                                    Image {group.image_index +
+                                                        1}
+                                                </p>
+                                                {#if group.plates.length > 0}
+                                                    <div class="space-y-2">
+                                                        {#each group.plates as det}
+                                                            <div
+                                                                class="flex items-center justify-between bg-white/3 rounded px-4 py-3"
+                                                            >
+                                                                <div
+                                                                    class="flex flex-col gap-1"
+                                                                >
+                                                                    <span
+                                                                        class="text-[#e8c84a] font-bold tracking-widest text-lg"
+                                                                        style="font-family: 'Syne', sans-serif;"
+                                                                    >
+                                                                        {det.text}
+                                                                    </span>
+                                                                    <div
+                                                                        class="flex items-center gap-2"
+                                                                    >
+                                                                        {#if det.valid_format}
+                                                                            <span
+                                                                                class="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                                                            >
+                                                                                ✓
+                                                                                {det.country}
+                                                                            </span>
+                                                                        {:else}
+                                                                            <span
+                                                                                class="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20"
+                                                                            >
+                                                                                ✗
+                                                                                Unknown
+                                                                                format
+                                                                            </span>
+                                                                        {/if}
+                                                                        <span
+                                                                            class="text-[10px] text-white/30"
+                                                                        >
+                                                                            {(
+                                                                                det.confidence *
+                                                                                100
+                                                                            ).toFixed(
+                                                                                0,
+                                                                            )}%
+                                                                            confidence
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <span
+                                                                    class="text-[10px] text-white/30"
+                                                                    >det {(
+                                                                        det.conf *
+                                                                        100
+                                                                    ).toFixed(
+                                                                        0,
+                                                                    )}%</span
+                                                                >
+                                                            </div>
+                                                        {/each}
+                                                    </div>
+                                                {:else}
+                                                    <p
+                                                        class="text-white/30 text-xs"
+                                                    >
+                                                        No plates detected.
+                                                    </p>
+                                                {/if}
                                             </div>
                                         {/each}
                                     </div>
+                                </div>
+                            {/if}
+                        {:else}
+                            <label
+                                class="block border border-dashed border-white/10 rounded-lg p-8 text-center cursor-pointer hover:border-[#e8c84a]/40 transition-colors group"
+                            >
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    class="hidden"
+                                    onchange={(e) => handleFile(e, "pipeline")}
+                                />
+                                {#if previewUrl}
+                                    <img
+                                        src={previewUrl}
+                                        alt="preview"
+                                        class="max-h-48 mx-auto rounded mb-3 object-contain"
+                                    />
                                 {:else}
-                                    <p class="p-4 text-white/30 text-xs">
-                                        No plates detected.
-                                    </p>
+                                    <div
+                                        class="text-white/20 group-hover:text-white/40 transition-colors"
+                                    >
+                                        <div class="text-3xl mb-2">+</div>
+                                        <div
+                                            class="text-[11px] tracking-widest uppercase"
+                                        >
+                                            Drop image or click
+                                        </div>
+                                    </div>
                                 {/if}
-                            </div>
+                                {#if pipelineFile}<p
+                                        class="text-[10px] text-white/30 mt-2"
+                                    >
+                                        {pipelineFile.name}
+                                    </p>{/if}
+                            </label>
+
+                            <button
+                                onclick={runPipeline}
+                                disabled={!pipelineFile || loading}
+                                class="w-full py-3 bg-[#e8c84a] text-[#0a0a0a] text-[11px] tracking-[3px] uppercase font-bold rounded disabled:opacity-30 hover:bg-[#f0d060] transition-colors"
+                            >
+                                {loading ? "Running..." : "Run Pipeline"}
+                            </button>
+
+                            {#if pipelineResult}
+                                <div
+                                    class="border border-white/5 rounded-lg overflow-hidden"
+                                >
+                                    <div
+                                        class="px-4 py-2 bg-white/3 border-b border-white/5 text-[10px] tracking-widest text-white/30 uppercase"
+                                    >
+                                        Result
+                                    </div>
+                                    {#if Array.isArray(pipelineResult) && pipelineResult.length > 0}
+                                        <div class="p-4 space-y-2">
+                                            {#each pipelineResult as det}
+                                                <div
+                                                    class="flex items-center justify-between bg-white/3 rounded px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="flex flex-col gap-1"
+                                                    >
+                                                        <span
+                                                            class="text-[#e8c84a] font-bold tracking-widest text-lg"
+                                                            style="font-family: 'Syne', sans-serif;"
+                                                        >
+                                                            {det.text}
+                                                        </span>
+                                                        <div
+                                                            class="flex items-center gap-2"
+                                                        >
+                                                            {#if det.valid_format}
+                                                                <span
+                                                                    class="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                                                >
+                                                                    ✓ {det.country}
+                                                                </span>
+                                                            {:else}
+                                                                <span
+                                                                    class="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20"
+                                                                >
+                                                                    ✗ Unknown
+                                                                    format
+                                                                </span>
+                                                            {/if}
+                                                            <span
+                                                                class="text-[10px] text-white/30"
+                                                            >
+                                                                {(
+                                                                    det.confidence *
+                                                                    100
+                                                                ).toFixed(0)}%
+                                                                confidence
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <span
+                                                        class="text-[10px] text-white/30"
+                                                        >det {(
+                                                            det.conf * 100
+                                                        ).toFixed(0)}%</span
+                                                    >
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    {:else}
+                                        <p class="p-4 text-white/30 text-xs">
+                                            No plates detected.
+                                        </p>
+                                    {/if}
+                                </div>
+                            {/if}
                         {/if}
                     </div>
                 {:else if activeTab === "detect"}
@@ -424,6 +631,28 @@
                                 >
                                     {recognizeResult.text ?? "—"}
                                 </p>
+                                <div
+                                    class="flex items-center justify-center gap-2 mt-3"
+                                >
+                                    {#if recognizeResult.valid_format}
+                                        <span
+                                            class="text-[10px] tracking-widest uppercase px-2 py-1 rounded bs-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                        >
+                                            ✓ {recognizeResult.country}
+                                        </span>
+                                    {:else}
+                                        <span
+                                            class="text-[10px] tracking-widest uppercase px-2 py-1 rounded bs-red-500/10 text-red-400 border border-red-500/20"
+                                        >
+                                            ✗ Unknown format
+                                        </span>
+                                    {/if}
+                                    <span class="text-[10px] text-white/30">
+                                        {(
+                                            recognizeResult.confidence * 100
+                                        ).toFixed(0)}% confidence
+                                    </span>
+                                </div>
                             </div>
                         {/if}
                     </div>
@@ -493,17 +722,39 @@
                                             <div
                                                 class="flex items-center justify-between bg-white/3 rounded px-4 py-3"
                                             >
-                                                <span
-                                                    class="text-[#e8c84a] font-bold tracking-widest"
-                                                    style="font-family: 'Syne', sans-serif;"
-                                                    >{det.text}</span
+                                                <div
+                                                    class="flex flex-col gap-1"
                                                 >
+                                                    <span
+                                                        class="text-[#e8c84a] font-bold tracking-widests"
+                                                        style="font-family: 'Syne', sans-serif;"
+                                                        >{det.text}</span
+                                                    >
+                                                    <div
+                                                        class="flex items-center gap-2"
+                                                    >
+                                                        {#if det.valid_format}
+                                                            <span
+                                                                class="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                                            >
+                                                                ✓ {det.country}
+                                                            </span>
+                                                        {:else}
+                                                            <span
+                                                                class="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20"
+                                                            >
+                                                                ✗ Unknown format
+                                                            </span>
+                                                        {/if}
+                                                    </div>
+                                                </div>
                                                 <span
                                                     class="text-[10px] text-white/30"
-                                                    >{(det.conf * 100).toFixed(
-                                                        0,
-                                                    )}%</span
                                                 >
+                                                    {(det.conf * 100).toFixed(
+                                                        0,
+                                                    )}%
+                                                </span>
                                             </div>
                                         {/each}
                                     </div>
@@ -578,17 +829,44 @@
                                         <div
                                             class="flex items-center justify-between bg-white/3 rounded px-4 py-3"
                                         >
-                                            <span
-                                                class="text-[#e8c84a] font-bold tracking-widest"
-                                                style="font-family: 'Syne', sans-serif;"
-                                                >{det.text}</span
-                                            >
+                                            <div class="flex flex-col gap-1">
+                                                <span
+                                                    class="text-[#e8c84a] font-bold tracking-widest"
+                                                    style="font-family: 'Syne', sans-serif;"
+                                                    >{det.text}</span
+                                                >
+                                                <div
+                                                    class="flex items-center gap-2"
+                                                >
+                                                    {#if det.valid_format}
+                                                        <span
+                                                            class="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                                        >
+                                                            ✓ {det.country}
+                                                        </span>
+                                                    {:else}
+                                                        <span
+                                                            class="text-[10px] tracking-widest uppercase px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20"
+                                                        >
+                                                            ✗ Unknown format
+                                                        </span>
+                                                    {/if}
+                                                    <span
+                                                        class="text-[10px] text-white/30"
+                                                    >
+                                                        {(
+                                                            det.confidence * 100
+                                                        ).toFixed(0)}%
+                                                    </span>
+                                                </div>
+                                            </div>
                                             <span
                                                 class="text-[10px] text-white/30"
-                                                >{(det.conf * 100).toFixed(
-                                                    0,
-                                                )}%</span
                                             >
+                                                det {(det.conf * 100).toFixed(
+                                                    0,
+                                                )}%
+                                            </span>
                                         </div>
                                     {/each}
                                 </div>
