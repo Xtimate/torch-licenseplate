@@ -86,18 +86,16 @@ def _softmax(x: np.ndarray) -> np.ndarray:
 
 
 def _greedy_ctc(probs: np.ndarray, blank: int) -> tuple:
-    """probs: softmaxed [T, num_chars]"""
     chars, confs = [], []
     prev = None
     for t in range(probs.shape[0]):
         token = int(np.argmax(probs[t]))
         peak = float(probs[t, token])
-        if token != prev or token == BLANK:
-            prev = token
-            continue
-        chars.append(idx_to_char[token])
-        confs.append(peak)
+        if token != prev and token != blank:
+            chars.append(idx_to_char[token])
+            confs.append(peak)
         prev = token
+    print(f"chars: {chars}, confs: {confs}")
     return "".join(chars), confs
 
 
@@ -113,6 +111,7 @@ def load_recognizer(num_chars, model_path, device):
 
 def recognize_from_image(image, model, device):
     img = image.resize((188, 48)).convert("RGB")
+    img.save("/tmp/debug_crop.jpg")
     tensor = to_tensor(img).unsqueeze(0).to(device)
     with torch.no_grad():
         output = model(tensor)
@@ -121,6 +120,7 @@ def recognize_from_image(image, model, device):
 
 
 def load_recognizer_onnx(model_path: str):
+    print(f"loading model from {os.path.abspath(model_path)}")
     return ort.InferenceSession(model_path)
 
 
