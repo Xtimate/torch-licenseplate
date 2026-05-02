@@ -41,7 +41,7 @@ if __name__ == "__main__":
     best_checkpoint_path = os.path.abspath("checkpoints/lprnet_best.pth")
 
     model = LPRNet(num_chars=len(CHARS)).to(device)
-    dataset = LicensePlateDataset(size=10000, data_dir="data/plates")
+    dataset = LicensePlateDataset(size=21325, data_dir="data/mixed")
     print(f"Loaded {len(dataset)} images from data/plates")
     dataloader = DataLoader(
         dataset,
