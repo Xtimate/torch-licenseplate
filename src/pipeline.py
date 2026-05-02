@@ -20,6 +20,7 @@ def run_pipeline(detector, recognizer, image: Image.Image, device):
         results.append(
             {
                 "text": result.text,
+                "confidence": result.confidence,
                 "valid_format": result.valid_format,
                 "country": result.country,
                 "x1": det["x1"],
