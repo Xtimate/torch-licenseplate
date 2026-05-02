@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 import dataset
@@ -33,6 +34,13 @@ app.include_router(recognize.router)
 app.include_router(pipeline.router)
 app.include_router(video.router)
 app.include_router(webcam.router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://xtimate.github.io"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
