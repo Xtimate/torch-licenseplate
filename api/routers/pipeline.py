@@ -1,6 +1,7 @@
 import io
 import os
 import sys
+from typing import List
 
 from fastapi import APIRouter, File, Request, UploadFile
 from PIL import Image
@@ -19,5 +20,20 @@ async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
         request.app.state.recognizer,
         image,
         request.app.state.device,
+    )
+    return result
+
+
+@router.post("/pipeline/batch")
+async def pipeline_batch_endpoint(
+    request: Request, files: list[UploadFile] = File(...)
+):
+    images = [
+        Image.open(io.BytesIO(await file.read())).convert("RGB") for file in files
+    ]
+    result = pipeline.run_pipeline_batch(
+        request.app.state.detector,
+        request.app.state.recognizer,
+        images,
     )
     return result

@@ -7,7 +7,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 from detector import detect_from_image
-from recognizer import recognize_from_image_onnx
+from recognizer import is_duplicate, recognize_from_image_onnx
 
 router = APIRouter()
 
@@ -30,12 +30,18 @@ async def webcam(websocket: WebSocket):
             results = []
             for det in detections:
                 crop = image.crop((det["x1"], det["y1"], det["x2"], det["y2"]))
-                text = recognize_from_image_onnx(crop, recognizer)
-                if text and text not in seen_plates:
-                    seen_plates.add(text)
+                result = recognize_from_image_onnx(crop, recognizer)
+
+                if result.rejected or not result.text:
+                    continue
+                if not is_duplicate(result.text, seen_plates):
+                    seen_plates.add(result.text)
                     results.append(
                         {
-                            "text": text,
+                            "text": result.text,
+                            "confidence": result.confidence,
+                            "valid_format": result.valid_format,
+                            "country": result.country,
                             "x1": det["x1"],
                             "y1": det["y1"],
                             "x2": det["x2"],

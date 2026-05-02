@@ -25,4 +25,9 @@ async def recognize(request: Request, file: UploadFile = File(...)):
             "confidence": result.confidence,
             "reason": result.rejection_reason,
         }
-    return {"text": result.text, "confidence": result.confidence}
+    return {
+        "text": result.text,
+        "confidence": result.confidence,
+        "valid_format": result.valid_format,
+        "country": result.country,
+    }

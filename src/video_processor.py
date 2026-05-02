@@ -1,9 +1,11 @@
+import re
+
 import cv2
 import numpy as np
 from PIL import Image
 
 from detector import detect_from_image
-from recognizer import recognize_from_image_onnx
+from recognizer import is_duplicate, recognize_from_image_onnx
 
 
 def process_video(video_path: str, detector, recognizer, conf: float = 0.3):
@@ -20,13 +22,17 @@ def process_video(video_path: str, detector, recognizer, conf: float = 0.3):
 
         for det in detections:
             crop = image.crop((det["x1"], det["y1"], det["x2"], det["y2"]))
-            text = recognize_from_image_onnx(crop, recognizer)
+            result = recognize_from_image_onnx(crop, recognizer)
 
-            if text and text not in seen_plates:
-                seen_plates.add(text)
+            if result.rejected or not result.text:
+                continue
+            if not is_duplicate(result.text, seen_plates):
+                seen_plates.add(result.text)
                 results.append(
                     {
-                        "text": text,
+                        "text": result.text,
+                        "valid_format": result.valid_format,
+                        "country": result.country,
                         "x1": det["x1"],
                         "y1": det["y1"],
                         "x2": det["x2"],

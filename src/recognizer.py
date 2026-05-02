@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from dataclasses import dataclass
 from typing import Optional
@@ -24,6 +25,25 @@ class RecognitionResult:
     char_confidences: list
     rejected: bool
     rejection_reason: Optional[str] = None
+    valid_format: bool = False
+    country: Optional[str] = None
+
+
+NL_PATTERNS = [
+    r"^\d{2}[A-Z]{3}\d$",  # DD-LLL-D
+    r"^[A-Z]{2}\d{3}[A-Z]$",  # LL-DDD-L
+    r"^[A-Z]\d{3}[A-Z]{2}$",  # L-DDD-LL
+    r"^\d{2}[A-Z]{2}\d{2}$",  # DD-LL-DD
+    r"^[A-Z]{2}\d{2}[A-Z]{2}$",  # LL-DD-LL
+]
+DE_PATTERNS = [
+    r"^[A-Z]{3}\d{4}$",  # LLL-DD-DD
+    r"^[A-Z]{2}\d{5}$",  # LL-DDD-DD
+    r"^[A-Z]{4}\d{4}$",  # LLLL-DD-DD
+]
+FR_PATTERNS = [
+    r"^[A-Z]{2}\d{3}[A-Z]{2}$"  # LL-DDD-LL
+]
 
 
 class LPRNet(nn.Module):
@@ -132,3 +152,37 @@ def recognize_from_image_onnx(
     )
 
     return RecognitionResult(text, confidence, char_confs, rejected, reason)
+
+
+def is_duplicate(text: str, seen: set[str], max_distance: int = 2) -> bool:
+    for seen_plate in seen:
+        if _levenshtein(text, seen_plate) <= max_distance:
+            return True
+    return False
+
+
+def _levenshtein(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if len(a) < len(b):
+        a, b = b, a
+    row = list(range(len(b) + 1))
+    for c1 in a:
+        new_row = [row[0] + 1]
+        for j, c2 in enumerate(b):
+            new_row.append(min(row[j + 1] + 1, new_row[-1] + 1, row[j] + (c1 != c2)))
+        row = new_row
+    return row[-1]
+
+
+def validate_format(text: str) -> tuple[bool, str | None]:
+    for pattern in NL_PATTERNS:
+        if re.match(pattern, text):
+            return True, "NL"
+    for pattern in DE_PATTERNS:
+        if re.match(pattern, text):
+            return True, "DE"
+    for pattern in FR_PATTERNS:
+        if re.match(pattern, text):
+            return True, "FR"
+    return False, None

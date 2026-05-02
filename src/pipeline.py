@@ -9,13 +9,19 @@ def run_pipeline(detector, recognizer, image: Image.Image, device):
     results = []
     for det in detections:
         crop = image.crop((det["x1"], det["y1"], det["x2"], det["y2"]))
-        text = recognize_from_image_onnx(
+        result = recognize_from_image_onnx(
             crop,
             recognizer,
         )
+
+        if result.rejected or not result.text:
+            continue
+
         results.append(
             {
-                "text": text,
+                "text": result.text,
+                "valid_format": result.valid_format,
+                "country": result.country,
                 "x1": det["x1"],
                 "y1": det["y1"],
                 "x2": det["x2"],
@@ -23,4 +29,12 @@ def run_pipeline(detector, recognizer, image: Image.Image, device):
                 "conf": det["conf"],
             }
         )
+    return results
+
+
+def run_pipeline_batch(detector, recognizer, images: list[Image.Image]):
+    results = []
+    for i, image in enumerate(images):
+        plates = run_pipeline(detector, recognizer, image, None)
+        results.append({"image_index": i, "plates": plates})
     return results
