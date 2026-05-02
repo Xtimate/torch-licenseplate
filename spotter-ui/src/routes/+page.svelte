@@ -3,7 +3,7 @@
     import { onDestroy } from "svelte";
 
     const API_BASE = import.meta.env.VITE_API_BASE;
-    const WS_BASE = import.meta.env.VITS_API_BASE.replace("http", "ws");
+    const WS_BASE = import.meta.env.VITE_API_BASE.replace("http", "ws");
     let activeTab = $state("pipeline");
     let pipelineFile: File | null = $state(null);
     let detectFile: File | null = $state(null);
