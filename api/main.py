@@ -10,16 +10,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from collections import OrderedDict
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-import dataset
-import detector as det_module
-import recognizer as rec_module
+import dataset  # type: ignore
+import detector as det_module  # type: ignore
+import recognizer as rec_module  # type: ignore
 from api.config import CONF_THRESHOLD, DETECTOR_WEIGHTS, DEVICE, RECOGNIZER_WEIGHTS
 from api.routers import detect, pipeline, recognize, video, webcam
 from src.detector import load_detector_onnx
@@ -76,5 +77,21 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+def health(request: Request):
+    detector_ok = request.state.detector is not None
+    recognizer_ok = request.state.recognizer is not None
+
+    components = {
+        "detector": "ok" if detector_ok else "not loaded",
+        "recognizer": "ok" if recognizer_ok else "not loaded",
+    }
+
+    all_ok = all([detector_ok, recognizer_ok])
+
+    return JSONResponse(
+        content={
+            "status": "ok" if all_ok else "degraded",
+            "components": components,
+        },
+        status_code=200 if all_ok else 503,
+    )
