@@ -24,9 +24,9 @@ async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
     contents = await file.read()
     image_hash = hashlib.md5(contents).hexdigest()
 
-    cashed = request.state.cache.get(image_hash)
-    if cashed is not None:
-        return cashed
+    cached = request.app.state.cache.get(image_hash)
+    if cached is not None:
+        return cached
 
     image = Image.open(io.BytesIO(contents)).convert("RGB")
     result = pipeline.run_pipeline(  # type: ignore
