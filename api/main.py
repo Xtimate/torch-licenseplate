@@ -22,7 +22,8 @@ import dataset  # type: ignore
 import detector as det_module  # type: ignore
 import recognizer as rec_module  # type: ignore
 from api.config import CONF_THRESHOLD, DETECTOR_WEIGHTS, DEVICE, RECOGNIZER_WEIGHTS
-from api.routers import detect, pipeline, recognize, video, webcam
+from api.database import init_db
+from api.routers import detect, history, pipeline, recognize, video, watchlist, webcam
 from src.detector import load_detector_onnx
 from src.recognizer import load_recognizer_onnx
 
@@ -50,6 +51,7 @@ class LRUCache:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()
     app.state.detector = load_detector_onnx("onnx/detector_best.onnx")
     app.state.recognizer = load_recognizer_onnx("onnx/lprnet.onnx")
     app.state.device = DEVICE
@@ -64,6 +66,8 @@ app.include_router(recognize.router)
 app.include_router(pipeline.router)
 app.include_router(video.router)
 app.include_router(webcam.router)
+app.include_router(history.router)
+app.include_router(watchlist.router)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
 app.add_middleware(

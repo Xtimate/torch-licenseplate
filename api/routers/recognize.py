@@ -1,35 +1,24 @@
-import hashlib
 import io
 import os
 import sys
 
 from fastapi import APIRouter, File, Request, UploadFile
 from PIL import Image
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 import recognizer  # type: ignore
+from api.database import check_watchlist, insert_plate
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/recognize")
-@limiter.limit("20/minute")
 async def recognize(request: Request, file: UploadFile = File(...)):
     contents = await file.read()
-
-    image_hash = hashlib.md5(contents).hexdigest()
-    cashed = request.state.cache.get(image_hash)
-    if cashed is not None:
-        return cashed
-
     image = Image.open(io.BytesIO(contents)).convert("RGB")
     result = recognizer.recognize_from_image_onnx(
         image, request.app.state.recognizer, threshold=request.app.state.conf
     )
-    request.state.cache.set(image_hash, result)
 
     if result.rejected:
         return {
@@ -37,9 +26,27 @@ async def recognize(request: Request, file: UploadFile = File(...)):
             "confidence": result.confidence,
             "reason": result.rejection_reason,
         }
-    return {
+
+    # Save to database
+    insert_plate(
+        text=result.text,
+        country=result.country,
+        confidence=result.confidence,
+        valid_format=result.valid_format,
+        source="recognize",
+    )
+
+    # Check watchlist
+    watch = check_watchlist(result.text)
+    response = {
         "text": result.text,
         "confidence": result.confidence,
+        "char_confidences": result.char_confidences,
         "valid_format": result.valid_format,
         "country": result.country,
     }
+    if watch:
+        response["watchlist_hit"] = True
+        response["watchlist_notes"] = watch.get("notes")
+
+    return response

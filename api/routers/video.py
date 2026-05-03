@@ -1,35 +1,41 @@
-import hashlib
+import io
 import os
 import sys
-import tempfile
 
 from fastapi import APIRouter, File, Request, UploadFile
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-import video_processor as video  # type: ignore
-from api.routers.recognize import router
+import video_processor  # type: ignore
+from api.database import check_watchlist, insert_plate
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/video")
-@limiter.limit("5/minute")
-async def video_endpoint(request: Request, file: UploadFile = File(...)):
+async def video(request: Request, file: UploadFile = File(...)):
     contents = await file.read()
 
-    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp:
-        temp.write(contents)
-        tmp_path = temp.name
-
-    results = video.process_video(
-        tmp_path,
+    results = video_processor.process_video(
+        contents,
         request.app.state.detector,
         request.app.state.recognizer,
-        request.app.state.conf,
+        conf=request.app.state.conf,
     )
 
-    os.unlink(tmp_path)
+    # Save each unique plate to the database
+    for plate in results:
+        insert_plate(
+            text=plate["text"],
+            country=plate.get("country"),
+            confidence=plate.get("confidence", 0),
+            valid_format=plate.get("valid_format", False),
+            source="video",
+        )
+        # Flag watchlist hits
+        watch = check_watchlist(plate["text"])
+        if watch:
+            plate["watchlist_hit"] = True
+            plate["watchlist_notes"] = watch.get("notes")
+
     return results

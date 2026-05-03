@@ -8,6 +8,8 @@ from PIL import Image
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from api.database import check_watchlist, insert_plate
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 import pipeline
 
@@ -33,6 +35,19 @@ async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
         image,
         request.app.state.device,
     )
+    for plate in result:
+        insert_plate(
+            text=plate["text"],
+            country=plate.get("country"),
+            confidence=plate.get("confidence", 0.0),
+            valid_format=plate.get("valid_format", False),
+            source="pipeline",
+        )
+        watch = check_watchlist(plate["text"])
+        if watch:
+            plate["watchlist_hit"] = True
+            plate["watchlist_notes"] = watch.get("notes")
+
     request.app.state.cache.set(image_hash, result)
     return result
 
