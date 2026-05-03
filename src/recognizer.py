@@ -125,20 +125,12 @@ def load_recognizer_onnx(model_path: str):
 
 
 def recognize_from_image_onnx(
-    image, session, threshold: float = 0.7
+    image, session, threshold: float = 0.7, _retries: int = 0
 ) -> RecognitionResult:
     img = image.resize((188, 48)).convert("RGB")
     tensor = to_tensor(img).unsqueeze(0).numpy()
-    print(
-        f"tensor shape: {tensor.shape}, min: {tensor.min():.3f}, max: {tensor.max():.3f}"
-    )
     logits = session.run(None, {"input": tensor})[0]  # [T, 1, num_chars]
-    print(
-        f"logits shape: {logits.shape}, min: {logits.min():.3f}, max: {logits.max():.3f}"
-    )
-    print(f"raw argmax: {logits.argmax(axis=2).squeeze().tolist()}")
     probs = _softmax(logits[:, 0, :])  # [T, num_chars]
-    print(f"top tokens: {np.argmax(probs, axis=1).tolist()}")
     blank = logits.shape[2] - 1  # last token is blank
     text, char_confs = _greedy_ctc(probs, blank)
 
@@ -151,6 +143,12 @@ def recognize_from_image_onnx(
         f"confidence {confidence:.3f} below threshold {threshold}" if rejected else None
     )
     valid_format, country = validate_format(text)
+
+    if not valid_format and _retries < 2:
+        embedded, _ = find_embedded_pattern(text)
+        if embedded:
+            return recognize_from_image_onnx(image, session, threshold, _retries + 1)
+
     return RecognitionResult(
         text=text,
         confidence=confidence,
@@ -193,4 +191,14 @@ def validate_format(text: str) -> tuple[bool, str | None]:
     for pattern in FR_PATTERNS:
         if re.match(pattern, text):
             return True, "FR"
+    return False, None
+
+
+def find_embedded_pattern(text: str) -> tuple[bool, str | None]:
+    for length in range(len(text) - 1, 4, -1):
+        for start in range(len(text) - length + 1):
+            substring = text[start : start + length]
+            valid, country = validate_format(substring)
+            if valid:
+                return True, country
     return False, None
