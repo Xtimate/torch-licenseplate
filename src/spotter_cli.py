@@ -170,7 +170,7 @@ def run_recognize(config):
         if result.rejected:
             print(f"  Rejected   : {result.rejection_reason}")
     else:
-        device = torch.device(str(config["inference"]["device"]))
+        device = torch.device(str(config["inference"]["device"]))  # type: ignore
         model = load_recognizer(len(CHARS), config["models"]["recognizer_pt"], device)
         text = recognize_from_image(img, model, device)
         print(f"\n  Text       : {text or '—'}")
@@ -228,7 +228,7 @@ def run_pipeline(config, batch=False):
         detector = load_detector(config["models"]["detector_pt"])
         from recognizer import load_recognizer
 
-        device = torch.device(config["inference"]["device"])
+        device = torch.device(config["inference"]["device"])  # type: ignore
         recognizer = load_recognizer(
             len(CHARS), config["models"]["recognizer_pt"], device
         )

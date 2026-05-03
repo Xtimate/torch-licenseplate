@@ -205,11 +205,11 @@ def random_plate(country=None):
 
 
 transform = A.Compose(
-    [
+    [  # type: ignore
         A.RandomBrightnessContrast(brightness_limit=0.20, contrast_limit=0.20, p=0.5),
         A.GaussNoise(p=0.3),
         A.MotionBlur(blur_limit=7, p=0.35),
-        A.ImageCompression(compression_type="jpeg", quality=(50, 95), p=0.5),
+        A.ImageCompression(compression_type="jpeg", quality=(50, 95), p=0.5),  # type: ignore
         A.GaussianBlur(blur_limit=3, p=0.25),
         A.RandomRain(p=0.1),
         A.Perspective(scale=(0.03, 0.08), p=0.5),

@@ -12,7 +12,7 @@ from torchvision.transforms.functional import to_tensor
 
 from dataset import CHARS, idx_to_char
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # type: ignore
 sys.path.insert(0, os.path.dirname(__file__))
 
 BLANK = len(CHARS) - 1
@@ -115,8 +115,8 @@ def recognize_from_image(image, model, device):
     tensor = to_tensor(img).unsqueeze(0).to(device)
     with torch.no_grad():
         output = model(tensor)
-        log_probs = torch.log_softmax(output, dim=2)
-        return ctc_decode(log_probs)
+        log_probs = torch.log_softmax(output, dim=2)  # type: ignore
+        return _greedy_ctc(log_probs)  # type: ignore
 
 
 def load_recognizer_onnx(model_path: str):

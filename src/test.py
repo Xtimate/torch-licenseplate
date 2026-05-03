@@ -42,7 +42,7 @@ def predict_image(model, img, device):
     tensor = to_tensor(img).unsqueeze(0).to(device)
     with torch.no_grad():
         output = model(tensor)
-        log_probs = torch.log_softmax(output, dim=2)
+        log_probs = torch.log_softmax(output, dim=2)  # type: ignore
     return ctc_decode(log_probs)
 
 
@@ -59,7 +59,7 @@ def test_synthetic(model, device, n=20):
         tensor = img.unsqueeze(0).to(device)
         with torch.no_grad():
             output = model(tensor)
-            log_probs = torch.log_softmax(output, dim=2)
+            log_probs = torch.log_softmax(output, dim=2)  # type: ignore
         predicted = ctc_decode(log_probs)
         expected = "".join([idx_to_char[c] for c in label])
         match = "✓" if predicted == expected else "✗"
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # type: ignore
     print(f"Device : {device}")
     print(f"Checkpoint: {os.path.abspath(args.checkpoint)}")
 

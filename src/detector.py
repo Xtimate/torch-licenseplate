@@ -1,5 +1,5 @@
 from PIL import Image
-from ultralytics import YOLO
+from ultralytics import YOLO  # type: ignore
 
 
 def load_detector(weights_path: str):
@@ -26,6 +26,6 @@ def detect_from_image(model, image: Image.Image, conf: float = 0.3):
 
 
 def load_detector_onnx(model_path: str):
-    from ultralytics import YOLO
+    from ultralytics import YOLO  # type: ignore
 
     return YOLO(model_path, task="detect")

@@ -60,7 +60,7 @@ class LicensePlateDataset(Dataset):
     def __getitem__(self, index):
         if self.mode == "disk":
             filename, text = self.entries[index].split(" ", 1)
-            img = Image.open(os.path.join(self.data_dir, filename)).convert("RGB")
+            img = Image.open(os.path.join(self.data_dir, filename)).convert("RGB")  # type: ignore
         else:
             from generator import random_plate
 

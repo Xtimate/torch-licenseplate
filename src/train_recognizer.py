@@ -11,7 +11,7 @@ from tqdm import tqdm
 from dataset import CHARS, LicensePlateDataset, idx_to_char
 from recognizer import LPRNet
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # type: ignore
 print(f"Using device: {device}")
 
 
@@ -31,8 +31,8 @@ def ctc_decode(output):
 def collate_fn(batch):
     imgs, labels = zip(*batch)
     imgs = torch.stack(imgs)
-    target_lengths = torch.tensor([len(l) for l in labels], dtype=torch.long)
-    labels_flat = torch.tensor([idx for l in labels for idx in l], dtype=torch.long)
+    target_lengths = torch.tensor([len(l) for l in labels], dtype=torch.long)  # type: ignore
+    labels_flat = torch.tensor([idx for l in labels for idx in l], dtype=torch.long)  # type: ignore
     return imgs, labels_flat, target_lengths
 
 
@@ -86,9 +86,12 @@ if __name__ == "__main__":
 
             optimizer.zero_grad()
             outputs = model(imgs)
-            log_probs = torch.log_softmax(outputs, dim=2)
-            input_lengths = torch.full(
-                (imgs.size(0),), outputs.size(0), dtype=torch.long, device=device
+            log_probs = torch.log_softmax(outputs, dim=2)  # type: ignore
+            input_lengths = torch.full(  # type: ignore
+                (imgs.size(0),),
+                outputs.size(0),
+                dtype=torch.long,  # type: ignore
+                device=device,  # type: ignore
             )
 
             loss = loss_fn(log_probs, labels_flat, input_lengths, target_lengths)
@@ -117,7 +120,7 @@ if __name__ == "__main__":
             for i in range(5):
                 img, label = dataset[i]
                 out = model(img.unsqueeze(0).to(device))
-                out = torch.log_softmax(out, dim=2)
+                out = torch.log_softmax(out, dim=2)  # type: ignore
                 predicted = ctc_decode(out)
                 expected = "".join([idx_to_char[c] for c in label])
                 match = "✓" if predicted == expected else "✗"

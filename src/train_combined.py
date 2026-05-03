@@ -15,7 +15,7 @@ from tqdm import tqdm
 from dataset import CHARS, LicensePlateDataset, char_to_idx, idx_to_char
 from recognizer import LPRNet
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # type: ignore
 print(f"Using device: {device}")
 
 REAL_PLATES_DIR = "data/real-plates/eu-license-plates/eu"
@@ -25,16 +25,16 @@ AUGMENT_TIMES = 20  # each real plate repeated 20x with augmentation
 # ── Real plates dataset ────────────────────────────────────────────────────────
 
 real_aug = A.Compose(
-    [
+    [  # type: ignore
         A.Rotate(limit=5, p=0.5),
         A.GaussianBlur(blur_limit=(3, 7), p=0.5),
         A.GaussNoise(p=0.5),
         A.RandomBrightnessContrast(p=0.7),
         A.HueSaturationValue(p=0.3),
         A.Perspective(scale=(0.02, 0.05), p=0.4),
-        A.Downscale(scale_min=0.5, scale_max=0.9, p=0.3),
+        A.Downscale(scale_min=0.5, scale_max=0.9, p=0.3),  # type: ignore
         A.Sharpen(p=0.3),
-        A.ImageCompression(compression_type="jpeg", quality=(60, 95), p=0.3),
+        A.ImageCompression(compression_type="jpeg", quality=(60, 95), p=0.3),  # type: ignore
         A.MotionBlur(blur_limit=5, p=0.3),
     ]
 )
@@ -90,8 +90,8 @@ class RealPlatesDataset(Dataset):
 def collate_fn(batch):
     imgs, labels = zip(*batch)
     imgs = torch.stack(imgs)
-    target_lengths = torch.tensor([len(l) for l in labels], dtype=torch.long)
-    labels_flat = torch.tensor([idx for l in labels for idx in l], dtype=torch.long)
+    target_lengths = torch.tensor([len(l) for l in labels], dtype=torch.long)  # type: ignore
+    labels_flat = torch.tensor([idx for l in labels for idx in l], dtype=torch.long)  # type: ignore
     return imgs, labels_flat, target_lengths
 
 
@@ -166,9 +166,12 @@ if __name__ == "__main__":
 
             optimizer.zero_grad()
             outputs = model(imgs)
-            log_probs = torch.log_softmax(outputs, dim=2)
-            input_lengths = torch.full(
-                (imgs.size(0),), outputs.size(0), dtype=torch.long, device=device
+            log_probs = torch.log_softmax(outputs, dim=2)  # type: ignore
+            input_lengths = torch.full(  # type: ignore
+                (imgs.size(0),),
+                outputs.size(0),
+                dtype=torch.long,
+                device=device,  # type: ignore
             )
 
             loss = loss_fn(log_probs, labels_flat, input_lengths, target_lengths)
@@ -199,7 +202,7 @@ if __name__ == "__main__":
             for i in range(5):
                 img, label = synthetic[i]
                 out = model(img.unsqueeze(0).to(device))
-                out = torch.log_softmax(out, dim=2)
+                out = torch.log_softmax(out, dim=2)  # type: ignore
                 predicted = ctc_decode(out)
                 expected = "".join([idx_to_char[c] for c in label])
                 match = "✓" if predicted == expected else "✗"
