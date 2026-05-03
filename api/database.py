@@ -18,8 +18,8 @@ def init_db():
        CREATE TABLE IF NOT EXISTS plates (
            id INTEGER PRIMARY KEY AUTOINCREMENT,
            text TEXT NOT NULL,
-           country TEXT NOT NULL,
-           confidence REAL NOT NULL,
+           country TEXT,
+           confidence REAL,
            valid_format INTEGER,
            source TEXT,
            timestamp TEXT DEFAULT (datetime('now')),
