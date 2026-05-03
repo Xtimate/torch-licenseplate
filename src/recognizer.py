@@ -147,6 +147,7 @@ def recognize_from_image_onnx(
     if not valid_format and _retries < 2:
         embedded, _ = find_embedded_pattern(text)
         if embedded:
+            print(f"  retrying ({_retries + 1}/2) — '{text}' contains embedded pattern")
             return recognize_from_image_onnx(image, session, threshold, _retries + 1)
 
     return RecognitionResult(
