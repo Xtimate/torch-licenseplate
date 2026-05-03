@@ -1,3 +1,4 @@
+import hashlib
 import io
 import os
 import sys
@@ -18,13 +19,21 @@ limiter = Limiter(key_func=get_remote_address)
 @router.post("/pipeline")
 @limiter.limit("10/minute")
 async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
-    image = Image.open(io.BytesIO(await file.read())).convert("RGB")
+    contents = await file.read()
+    image_hash = hashlib.md5(contents).hexdigest()
+
+    cashed = request.state.cache.get(image_hash)
+    if cashed is not None:
+        return cashed
+
+    image = Image.open(io.BytesIO(contents)).convert("RGB")
     result = pipeline.run_pipeline(  # type: ignore
         request.app.state.detector,
         request.app.state.recognizer,
         image,
         request.app.state.device,
     )
+    request.app.state.cache.set(image_hash, result)
     return result
 
 

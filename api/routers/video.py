@@ -1,4 +1,4 @@
-import io
+import hashlib
 import os
 import sys
 import tempfile
@@ -19,6 +19,7 @@ limiter = Limiter(key_func=get_remote_address)
 @limiter.limit("5/minute")
 async def video_endpoint(request: Request, file: UploadFile = File(...)):
     contents = await file.read()
+
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp:
         temp.write(contents)
         tmp_path = temp.name

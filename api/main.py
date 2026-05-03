@@ -1,3 +1,4 @@
+import hashlib
 import os
 import sys
 
@@ -6,6 +7,7 @@ from torch.optim.optimizer import R
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -26,12 +28,32 @@ from src.recognizer import load_recognizer_onnx
 limiter = Limiter(key_func=get_remote_address)
 
 
+class LRUCache:
+    def __init__(self, maxsize=256):
+        self.cache = OrderedDict()
+        self.maxsize = maxsize
+
+    def get(self, key):
+        if key not in self.cache:
+            return None
+        self.cache.move_to_end(key)
+        return self.cache[key]
+
+    def set(self, key, value):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        self.cache[key] = value
+        if len(self.cache) > self.maxsize:
+            self.cache.popitem(last=False)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.detector = load_detector_onnx("onnx/detector_best.onnx")
     app.state.recognizer = load_recognizer_onnx("onnx/lprnet.onnx")
     app.state.device = DEVICE
     app.state.conf = CONF_THRESHOLD
+    app.state.cache = LRUCache(maxsize=256)
     yield
 
 
