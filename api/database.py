@@ -77,7 +77,7 @@ def get_stats():
 
     total = conn.execute("SELECT COUNT(*) FROM plates").fetchone()[0]
     by_country = conn.execute(
-        "SELECT country, COUNT(*) as count FROM plates GROUP BY country DESC"
+        "SELECT country, COUNT(*) as count FROM plates GROUP BY country DESC ORDER BY count DESC"
     ).fetchall()
     by_source = conn.execute(
         "SELECT source, COUNT(*) as count FROM plates GROUP BY source ORDER BY count DESC"
