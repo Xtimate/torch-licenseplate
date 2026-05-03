@@ -78,8 +78,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/health")
 def health(request: Request):
-    detector_ok = request.state.detector is not None
-    recognizer_ok = request.state.recognizer is not None
+    detector_ok = request.app.state.detector is not None
+    recognizer_ok = request.app.state.recognizer is not None
 
     components = {
         "detector": "ok" if detector_ok else "not loaded",
