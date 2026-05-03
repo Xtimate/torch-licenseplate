@@ -150,6 +150,20 @@ def recognize_from_image_onnx(
             print(f"  retrying ({_retries + 1}/2) — '{text}' contains embedded pattern")
             return recognize_from_image_onnx(image, session, threshold, _retries + 1)
 
+    if _retries >= 2:
+        trimmed = text[:-1]
+        valid_trimmed, country_trimmed = validate_format(trimmed)
+        if valid_trimmed:
+            return RecognitionResult(
+                text=trimmed,
+                confidence=confidence,
+                char_confidences=char_confs[:-1],
+                rejected=rejected,
+                rejection_reason=reason,
+                valid_format=True,
+                country=country_trimmed,
+            )
+
     return RecognitionResult(
         text=text,
         confidence=confidence,
