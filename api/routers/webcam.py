@@ -6,8 +6,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-from detector import detect_from_image
-from recognizer import is_duplicate, recognize_from_image_onnx
+from detector import detect_from_image  # type: ignore
+from recognizer import is_duplicate, recognize_from_image_onnx  # type: ignore
 
 router = APIRouter()
 

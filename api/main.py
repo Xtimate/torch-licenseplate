@@ -1,6 +1,8 @@
 import os
 import sys
 
+from torch.optim.optimizer import R
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -9,6 +11,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 import dataset
 import detector as det_module
@@ -17,6 +22,8 @@ from api.config import CONF_THRESHOLD, DETECTOR_WEIGHTS, DEVICE, RECOGNIZER_WEIG
 from api.routers import detect, pipeline, recognize, video, webcam
 from src.detector import load_detector_onnx
 from src.recognizer import load_recognizer_onnx
+
+limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
@@ -34,7 +41,8 @@ app.include_router(recognize.router)
 app.include_router(pipeline.router)
 app.include_router(video.router)
 app.include_router(webcam.router)
-
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://xtimate.github.io"],
