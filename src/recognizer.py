@@ -185,6 +185,10 @@ def validate_format(text: str) -> tuple[bool, str | None]:
     for pattern in NL_PATTERNS:
         if re.match(pattern, text):
             return True, "NL"
+    if len(text) > 5:
+        for pattern in NL_PATTERNS:
+            if re.match(pattern, text[:-1]):
+                return False, None
     for pattern in DE_PATTERNS:
         if re.match(pattern, text):
             return True, "DE"
