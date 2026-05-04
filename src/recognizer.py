@@ -132,7 +132,7 @@ def recognize_from_image_onnx(
     tensor = to_tensor(img).unsqueeze(0).numpy()
     logits = session.run(None, {"input": tensor})[0]
     blank = int(logits.shape[2] - 1)
-    text, char_confs = _greedy_ctc(logits[:, 0, :], temperature, blank)
+    text, char_confs = _greedy_ctc(logits[:, 0, :], blank, temperature)
 
     if not char_confs:
         return RecognitionResult("", 0.0, [], True, "empty_output")
