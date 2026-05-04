@@ -16,6 +16,7 @@ def run_pipeline(
             recognizer,
             temperature=temperature,
         )
+        print(f"  result: {result}")
         if result.rejected or not result.text:
             continue
         results.append(
