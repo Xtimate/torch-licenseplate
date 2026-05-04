@@ -136,8 +136,9 @@
 
     async function runPipeline() {
         pipelineResult = await post("/pipeline", pipelineFile);
-        if (Array.isArray(pipelineResult))
+        if (Array.isArray(pipelineResult) && pipelineResult.length > 0) {
             pushHistory(pipelineResult, "pipeline");
+            if (pipelineFile) await drawOverlay(pipelineFile, pipelineResult);
     }
     async function runDetect() {
         detectResult = await post("/detect", detectFile);
@@ -272,6 +273,46 @@
         await loadWatchlist();
     }
 
+    async function drawOverlay(file: File, plates: PlateResult[]) {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        await new Promise((res) => (img.onload = res));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.drawImage(img, 0, 0);
+
+        for (const p of plates) {
+            const { x1, y1, x2, y2 } = p as any;
+            if (x1 == null) continue;
+
+            const w = x2 - x1;
+            const h = y2 - y1;
+
+            ctx.strokeStyle = "#e8c84a";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x1, y1, w, h);
+            ctx.fillStyle = "rgba(232, 200, 74, 0.08)";
+            ctx.fillText(x1, y1, w, h);
+
+            const label = "${p.text} ${Math.round(p.confidence * 100)}%";
+            ctx.font = "bold 18 px DM Mono, monospace";
+            const textWidth = ctx.measureText(label).width;
+            const labelX = x1;
+            const labelY = y1 - 8;
+
+            ctx.fillStyle = "#e8c84a";
+            ctx.fillRect(labelX, labelY - 20, textWidth + 12, 24);
+            ctx.fillStyle = "0a0a0a";
+            ctx.fillText(label, labelX + 6, labelY - 2);
+        }
+
+        previewUrl = canvas.toDataURL("image/jpeg", 0.92);
+    }
     // ───────────────────────────────────────────────────────────
     // Derived
     // ───────────────────────────────────────────────────────────
