@@ -94,15 +94,39 @@ def load_plates(data_dir: str) -> list[tuple]:
 
 
 def evaluate_temperature(session, entries: list, temperature: float) -> float:
-    all_nll = []
+    n_bins = 10
+    bin_correct = np.zeros(n_bins)
+    bin_total = np.zeros(n_bins)
+    bin_conf = np.zeros(n_bins)
+
     for tensor, label in entries:
-        logits = session.run(None, {"input": tensor})[0]  # [T, 1, num_chars]
-        logits_2d = logits[:, 0, :]  # [T, num_chars]
+        logits = session.run(None, {"input": tensor})[0]
+        logits_2d = logits[:, 0, :]
         predicted, log_confs = _greedy_ctc_with_logprobs(logits_2d, temperature)
-        if predicted == label and log_confs:
-            all_nll.append(_nll(log_confs))
-    print(f"  correct: {len(all_nll)}/{len(entries)}")
-    return float(np.mean(all_nll)) if all_nll else float("inf")
+
+        if not log_confs:
+            continue
+
+        conf = float(np.mean(np.exp(log_confs)))
+        correct = predicted == label
+
+        bin_idx = min(int(conf * n_bins), n_bins - 1)
+        bin_correct[bin_idx] += int(correct)
+        bin_total[bin_idx] += 1
+        bin_conf[bin_idx] += conf
+
+    ece = 0.0
+    for i in range(n_bins):
+        if bin_total[i] == 0:
+            continue
+        avg_acc = bin_correct[i] / bin_total[i]
+        avg_conf = bin_conf[i] / bin_total[i]
+        print(
+            f"  bin {i}: total={int(bin_total[i])} conf={avg_conf:.2f} acc={avg_acc:.2f}"
+        )
+        ece += (bin_total[i] / len(entries)) * abs(avg_conf - avg_acc)
+
+    return float(ece)
 
 
 if __name__ == "__main__":
@@ -123,7 +147,7 @@ if __name__ == "__main__":
     best_t = 1.0
     best_nll = float("inf")
 
-    print(f"\n{'T':>6}  {'NLL':>8}  {'time':>6}")
+    print(f"\n{'T':>6}  {'ECE':>8}  {'time':>6}")
     print("-" * 26)
     for t in temperatures:
         t_start = time.time()
