@@ -5,8 +5,11 @@
     // ───────────────────────────────────────────────────────────
     // Config
     // ───────────────────────────────────────────────────────────
-    const API_BASE = import.meta.env.VITE_API_BASE;
-    const WS_BASE = import.meta.env.VITE_API_BASE.replace("http", "ws");
+    const API_BASE =
+        import.meta.env.VITE_API_BASE ?? "https://api.xtimate.tech";
+    const WS_BASE = (
+        import.meta.env.VITE_API_BASE ?? "https://api.xtimate.tech"
+    ).replace("http", "ws");
 
     type Mode =
         | "pipeline"
@@ -313,6 +316,39 @@
         }
 
         previewUrl = canvas.toDataURL("image/jpeg", 0.92);
+    }
+
+    function exportCSV() {
+        if (!historyResult || historyResult.length === 0) return;
+
+        const headers = [
+            "text",
+            "country",
+            "confidence",
+            "valid_format",
+            "source",
+            "timestamp",
+        ];
+        const rows = historyResult.map((p: any) =>
+            [
+                p.text ?? "",
+                p.country ?? "",
+                p.confidence != null ? Math.round(p.confidence * 100) : "",
+                p.valid_format ? "true" : "false",
+                p.source ?? "",
+                p.timestamp ?? "",
+            ].join(","),
+        );
+
+        const csv = [headers.join(","), ...rows].join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "spotter_history.csv";
+        a.click();
+
+        URL.revokeObjectURL(url);
     }
     // ───────────────────────────────────────────────────────────
     // Derived
@@ -1042,10 +1078,19 @@
                                 first.
                             </p>
                         </header>
-
-                        <button class="cta" onclick={loadHistory}
-                            >Load history</button
-                        >
+                        <div class="action-row">
+                            <button class="cta" onclick={loadHistory}
+                                >Load history</button
+                            >
+                            <button
+                                class="cta"
+                                onclick={exportCSV}
+                                disabled={!historyResult ||
+                                    historyResult.length === 0}
+                                style="flex: 0; padding: 14px 20px; "
+                                >Export CSV</button
+                            >
+                        </div>
 
                         {#if historyResult}
                             <div class="card">
