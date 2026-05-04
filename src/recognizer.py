@@ -97,7 +97,6 @@ def _greedy_ctc(logits: np.ndarray, blank, temperature: float = 1.0) -> tuple:
             chars.append(idx_to_char[token])
             confs.append(peak)
         prev = token
-    print(f"chars: {chars}, confs: {confs}")
     return "".join(chars), confs
 
 
