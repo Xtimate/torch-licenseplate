@@ -65,6 +65,7 @@ async def pipeline_batch_endpoint(
         request.app.state.detector,
         request.app.state.recognizer,
         images,
-        request.app.state.temperature,
+        temperature=request.app.state.temperature,
+        threshold=request.app.state.conf,
     )
     return result

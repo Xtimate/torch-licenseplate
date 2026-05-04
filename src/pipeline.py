@@ -5,7 +5,12 @@ from recognizer import recognize_from_image_onnx
 
 
 def run_pipeline(
-    detector, recognizer, image: Image.Image, device, temperature: float = 1.0
+    detector,
+    recognizer,
+    image: Image.Image,
+    device,
+    temperature: float = 1.0,
+    threshold: float = 0.7,
 ):
     detections = detect_from_image(detector, image)
     results = []
@@ -14,6 +19,7 @@ def run_pipeline(
         result = recognize_from_image_onnx(
             crop,
             recognizer,
+            threshold=threshold,
             temperature=temperature,
         )
         print(f"  result: {result}")
