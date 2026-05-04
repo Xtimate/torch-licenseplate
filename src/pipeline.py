@@ -4,7 +4,9 @@ from detector import detect_from_image
 from recognizer import recognize_from_image_onnx
 
 
-def run_pipeline(detector, recognizer, image: Image.Image, device):
+def run_pipeline(
+    detector, recognizer, image: Image.Image, device, temperature: float = 1.0
+):
     detections = detect_from_image(detector, image)
     results = []
     for det in detections:
@@ -12,11 +14,10 @@ def run_pipeline(detector, recognizer, image: Image.Image, device):
         result = recognize_from_image_onnx(
             crop,
             recognizer,
+            temperature=temperature,
         )
-
         if result.rejected or not result.text:
             continue
-
         results.append(
             {
                 "text": result.text,
@@ -33,9 +34,13 @@ def run_pipeline(detector, recognizer, image: Image.Image, device):
     return results
 
 
-def run_pipeline_batch(detector, recognizer, images: list[Image.Image]):
+def run_pipeline_batch(
+    detector, recognizer, images: list[Image.Image], temperature: float = 1.0
+):
     results = []
     for i, image in enumerate(images):
-        plates = run_pipeline(detector, recognizer, image, None)
+        plates = run_pipeline(
+            detector, recognizer, image, None, temperature=temperature
+        )
         results.append({"image_index": i, "plates": plates})
     return results

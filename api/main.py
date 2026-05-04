@@ -21,7 +21,13 @@ from slowapi.util import get_remote_address
 import dataset  # type: ignore
 import detector as det_module  # type: ignore
 import recognizer as rec_module  # type: ignore
-from api.config import CONF_THRESHOLD, DETECTOR_WEIGHTS, DEVICE, RECOGNIZER_WEIGHTS
+from api.config import (
+    CONF_THRESHOLD,
+    DETECTOR_WEIGHTS,
+    DEVICE,
+    RECOGNIZER_WEIGHTS,
+    TEMPERATURE,
+)
 from api.database import init_db
 from api.routers import detect, history, pipeline, recognize, video, watchlist, webcam
 from src.detector import load_detector_onnx
@@ -57,6 +63,7 @@ async def lifespan(app: FastAPI):
     app.state.device = DEVICE
     app.state.conf = CONF_THRESHOLD
     app.state.cache = LRUCache(maxsize=256)
+    app.state.temperature = TEMPERATURE
     yield
 
 

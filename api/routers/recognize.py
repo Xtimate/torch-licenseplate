@@ -17,7 +17,10 @@ async def recognize(request: Request, file: UploadFile = File(...)):
     contents = await file.read()
     image = Image.open(io.BytesIO(contents)).convert("RGB")
     result = recognizer.recognize_from_image_onnx(
-        image, request.app.state.recognizer, threshold=request.app.state.conf
+        image,
+        request.app.state.recognizer,
+        threshold=request.app.state.conf,
+        temperature=request.app.state.temperature,
     )
 
     if result.rejected:

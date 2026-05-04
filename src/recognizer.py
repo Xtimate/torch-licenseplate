@@ -85,7 +85,9 @@ def _softmax(x: np.ndarray) -> np.ndarray:
     return e / e.sum(axis=-1, keepdims=True)
 
 
-def _greedy_ctc(probs: np.ndarray, blank: int) -> tuple:
+def _greedy_ctc(logits: np.ndarray, blank, temperature: float = 1.0) -> tuple:
+    scaled = logits / temperature
+    probs = _softmax(scaled)
     chars, confs = [], []
     prev = None
     for t in range(probs.shape[0]):
@@ -125,14 +127,13 @@ def load_recognizer_onnx(model_path: str):
 
 
 def recognize_from_image_onnx(
-    image, session, threshold: float = 0.7, _retries: int = 0
+    image, session, threshold: float = 0.7, temperature: float = 1.0, _retries: int = 0
 ) -> RecognitionResult:
     img = image.resize((188, 48)).convert("RGB")
     tensor = to_tensor(img).unsqueeze(0).numpy()
-    logits = session.run(None, {"input": tensor})[0]  # [T, 1, num_chars]
-    probs = _softmax(logits[:, 0, :])  # [T, num_chars]
-    blank = logits.shape[2] - 1  # last token is blank
-    text, char_confs = _greedy_ctc(probs, blank)
+    logits = session.run(None, {"input": tensor})[0]
+    blank = int(logits.shape[2] - 1)
+    text, char_confs = _greedy_ctc(logits[:, 0, :], temperature, blank)
 
     if not char_confs:
         return RecognitionResult("", 0.0, [], True, "empty_output")

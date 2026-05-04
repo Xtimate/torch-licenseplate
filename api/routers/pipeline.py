@@ -34,6 +34,7 @@ async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
         request.app.state.recognizer,
         image,
         request.app.state.device,
+        request.app.state.temperature,
     )
     for plate in result:
         insert_plate(
@@ -64,5 +65,6 @@ async def pipeline_batch_endpoint(
         request.app.state.detector,
         request.app.state.recognizer,
         images,
+        request.app.state.temperature,
     )
     return result
