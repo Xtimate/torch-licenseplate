@@ -139,6 +139,7 @@
         if (Array.isArray(pipelineResult) && pipelineResult.length > 0) {
             pushHistory(pipelineResult, "pipeline");
             if (pipelineFile) await drawOverlay(pipelineFile, pipelineResult);
+        }
     }
     async function runDetect() {
         detectResult = await post("/detect", detectFile);
