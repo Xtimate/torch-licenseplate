@@ -297,17 +297,17 @@
             ctx.lineWidth = 3;
             ctx.strokeRect(x1, y1, w, h);
             ctx.fillStyle = "rgba(232, 200, 74, 0.08)";
-            ctx.fillText(x1, y1, w, h);
+            ctx.fillRect(x1, y1, w, h);
 
-            const label = "${p.text} ${Math.round(p.confidence * 100)}%";
-            ctx.font = "bold 18 px DM Mono, monospace";
+            const label = p.text + " " + Math.round(p.confidence * 100) + "%";
+            ctx.font = "bold 18px DM Mono, monospace";
             const textWidth = ctx.measureText(label).width;
             const labelX = x1;
             const labelY = y1 - 8;
 
             ctx.fillStyle = "#e8c84a";
             ctx.fillRect(labelX, labelY - 20, textWidth + 12, 24);
-            ctx.fillStyle = "0a0a0a";
+            ctx.fillStyle = "#0a0a0a";
             ctx.fillText(label, labelX + 6, labelY - 2);
         }
 
