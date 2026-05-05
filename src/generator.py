@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 BACKGROUNDS = [
     (255, 220, 0),  # NL yellow
     (255, 255, 255),  # white
+    (240, 240, 240),  # off-white
 ]
 DIGITS = string.digits
 LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -19,7 +20,20 @@ ALL_CHARS = DIGITS + LETTERS
 NL_FORMATS = ["DD-LLL-D", "LL-DDD-L", "L-DDD-LL", "DD-LL-DD", "LL-DD-LL"]
 DE_FORMATS = ["LLL-DD-DD", "LL-DDD-DD", "LLLL-DD-DD"]
 FR_FORMATS = ["LL-DDD-LL"]
-ALL_FORMATS = NL_FORMATS + DE_FORMATS + FR_FORMATS
+BE_FORMATS = ["D-LLL-DDD"]
+ES_FORMATS = ["DDDD-LLL"]
+PL_FORMATS = ["LL-DDDDD", "LL-DDDD-L", "LLL-DDDD", "LLL-DDD-L"]
+SE_FORMATS = ["LLL-DDD"]
+
+ALL_FORMATS = (
+    NL_FORMATS
+    + DE_FORMATS
+    + FR_FORMATS
+    + BE_FORMATS
+    + ES_FORMATS
+    + PL_FORMATS
+    + SE_FORMATS
+)
 
 
 def _fill_format(fmt):
@@ -96,12 +110,8 @@ def _add_glare(img):
     return Image.fromarray(arr)
 
 
-def _draw_eu_strip(draw, img_height, strip_width=52):
-    """Draw the blue EU strip on the left side of the plate."""
-    # Blue background
+def _draw_eu_strip(draw, img_height, strip_width=52, country="NL"):
     draw.rectangle((0, 0, strip_width, img_height), fill=(0, 51, 153))
-
-    # Yellow stars in a circle (simplified — just a ring of dots)
     cx = strip_width // 2
     star_r = 14
     num_stars = 12
@@ -114,42 +124,55 @@ def _draw_eu_strip(draw, img_height, strip_width=52):
             (sx - star_size, sy - star_size, sx + star_size, sy + star_size),
             fill=(255, 220, 0),
         )
-
-    # "NL" text at the bottom of the strip
     try:
         font_tiny = ImageFont.truetype(
             "/usr/share/fonts/liberation/LiberationSans-Bold.ttf", 13
         )
-        tbbox = draw.textbbox((0, 0), "NL", font=font_tiny)
+        tbbox = draw.textbbox((0, 0), country, font=font_tiny)
         tx = (strip_width - (tbbox[2] - tbbox[0])) // 2
         ty = img_height - 20
-        draw.text((tx, ty), "NL", font=font_tiny, fill=(255, 255, 255))
+        draw.text((tx, ty), country, font=font_tiny, fill=(255, 255, 255))
     except Exception:
         pass
 
 
 def generate_plate(text, country="NL"):
-    bg_color = random.choice(BACKGROUNDS)
+    if country in ("NL",):
+        bg_color = (255, 220, 0)  # yellow
+    else:
+        bg_color = (255, 255, 255)  # white
     bg_color = tuple(max(0, min(255, c + random.randint(-15, 15))) for c in bg_color)
 
-    img = Image.new("RGB", (520, 110), color=bg_color)
-    font = ImageFont.truetype(
-        "/home/xtimate/Documents/License-Plate-Torch/fonts/Kenteken.ttf", 72
-    )
+    plate_width = max(520, 60 * len(text))
+    img = Image.new("RGB", (plate_width, 110), color=bg_color)
     font_small = ImageFont.truetype(
         "/usr/share/fonts/liberation/LiberationSans-Bold.ttf", 16
     )
     draw = ImageDraw.Draw(img)
 
-    # --- EU strip (NL plates only, 80% of the time to add variety) ---
+    # --- EU strip ---
     strip_width = 0
-    if country == "NL" and random.random() < 0.80:
+    if random.random() < 0.80:
         strip_width = 52
-        _draw_eu_strip(draw, 110, strip_width)
+        _draw_eu_strip(draw, 110, strip_width, country)
 
     # Text area starts after the strip
     text_area_start = strip_width + 5
-    text_area_width = 520 - text_area_start
+    text_area_width = plate_width - text_area_start
+
+    # Scale font down if text is still too wide
+    font_size = 72
+    font = ImageFont.truetype(
+        "/home/xtimate/Documents/License-Plate-Torch/fonts/Kenteken.ttf", font_size
+    )
+    while font_size > 20:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        if bbox[2] - bbox[0] <= text_area_width - 20:
+            break
+        font_size -= 4
+        font = ImageFont.truetype(
+            "/home/xtimate/Documents/License-Plate-Torch/fonts/Kenteken.ttf", font_size
+        )
 
     bbox = draw.textbbox((0, 0), text, font=font)
     text_width = bbox[2] - bbox[0]
@@ -160,14 +183,14 @@ def generate_plate(text, country="NL"):
     text_color = tuple(random.randint(0, 30) for _ in range(3))
     draw.text((x, y), text, font=font, fill=text_color)
 
-    # Country label in strip (only if no EU strip drawn)
-    if strip_width == 0:
+    # Country label in strip (only if no EU strip drawn and not NL)
+    if strip_width == 0 and country != "NL":
         sbbox = draw.textbbox((0, 0), country, font=font_small)
         xs = (40 - (sbbox[2] - sbbox[0])) // 2 - sbbox[0]
         ys = (110 - (sbbox[3] - sbbox[1])) // 2 - sbbox[1] + 20
         draw.text((xs, ys), country, font=font_small, fill=(0, 0, 50))
 
-    draw.rectangle((0, 0, 519, 109), outline=(0, 0, 0), width=3)
+    draw.rectangle((0, 0, plate_width - 1, 109), outline=(0, 0, 0), width=3)
 
     img = _add_surface_wear(img)
     if random.random() < 0.7:
@@ -176,6 +199,8 @@ def generate_plate(text, country="NL"):
         img = _add_shadow(img)
     if random.random() < 0.25:
         img = _add_glare(img)
+
+    img = img.resize((520, 110), Image.LANCZOS)
 
     return img
 
@@ -188,12 +213,34 @@ def random_plate(country=None):
             label = "NL"
         elif fmt in DE_FORMATS:
             label = "DE"
-        else:
+        elif fmt in FR_FORMATS:
             label = "FR"
+        elif fmt in BE_FORMATS:
+            label = "BE"
+        elif fmt in ES_FORMATS:
+            label = "ES"
+        elif fmt in PL_FORMATS:
+            label = "PL"
+        else:
+            label = "SE"
         text = _fill_format(fmt)
     else:
-        label = random.choice(["NL", "DE", "FR", "BE", "PL"])
-        text = _random_plate_text(min_len=5, max_len=8)
+        label = random.choice(["NL", "DE", "FR", "BE", "PL", "ES", "SE"])
+        if label == "NL":
+            fmt = random.choice(NL_FORMATS)
+        elif label == "DE":
+            fmt = random.choice(DE_FORMATS)
+        elif label == "FR":
+            fmt = random.choice(FR_FORMATS)
+        elif label == "BE":
+            fmt = random.choice(BE_FORMATS)
+        elif label == "ES":
+            fmt = random.choice(ES_FORMATS)
+        elif label == "PL":
+            fmt = random.choice(PL_FORMATS)
+        else:
+            fmt = random.choice(SE_FORMATS)
+        text = _fill_format(fmt)
 
     if country is not None:
         label = country
