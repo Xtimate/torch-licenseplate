@@ -177,7 +177,9 @@ def recognize_from_image_onnx(
         embedded, _ = find_embedded_pattern(text)
         if embedded:
             print(f"  retrying ({_retries + 1}/2) — '{text}' contains embedded pattern")
-            return recognize_from_image_onnx(image, session, threshold, _retries + 1)
+            return recognize_from_image_onnx(
+                image, session, threshold, temperature, _retries + 1
+            )
 
     if _retries >= 2:
         trimmed = text[:-1]
@@ -206,6 +208,9 @@ def recognize_from_image_onnx(
                 country=fixed_country,
                 min_char_confidence=min_char_conf,
             )
+        print(
+            f"  conf={confidence:.3f} min_char={min_char_conf:.3f} rejected={rejected} reason={reason}"
+        )
 
     return RecognitionResult(
         text=text,
@@ -216,9 +221,6 @@ def recognize_from_image_onnx(
         valid_format=valid_format,
         country=country,
         min_char_confidence=min_char_conf,
-    )
-    print(
-        f"  conf={confidence:.3f} min_char={min_char_conf:.3f} rejected={rejected} reason={reason}"
     )
 
 
