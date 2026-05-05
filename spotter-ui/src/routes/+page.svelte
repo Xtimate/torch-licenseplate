@@ -1065,6 +1065,130 @@
                             </div>
                         </div>
 
+                        {#if webcamResults.length > 1}
+                            <div
+                                class="card"
+                                style="padding: 20px; grid-column: 1 / -1;"
+                            >
+                                <p
+                                    class="muted tiny"
+                                    style="margin-bottom: 12px;"
+                                >
+                                    Confidence over time
+                                </p>
+                                <svg
+                                    width="100%"
+                                    viewBox="0 0 600 120"
+                                    preserveAspectRatio="xMidYMid meet"
+                                    style="display:block;"
+                                >
+                                    <line
+                                        x1="0"
+                                        y1="96"
+                                        x2="572"
+                                        y2="96"
+                                        stroke="var(--muted2)"
+                                        stroke-width="1"
+                                    />
+                                    <line
+                                        x1="0"
+                                        y1="48"
+                                        x2="572"
+                                        y2="48"
+                                        stroke="var(--muted2)"
+                                        stroke-width="0.5"
+                                        stroke-dasharray="4,4"
+                                    />
+                                    <line
+                                        x1="0"
+                                        y1="8"
+                                        x2="572"
+                                        y2="8"
+                                        stroke="var(--muted2)"
+                                        stroke-width="0.5"
+                                        stroke-dasharray="4,4"
+                                    />
+                                    <text
+                                        x="578"
+                                        y="11"
+                                        font-size="9"
+                                        fill="#aaa"
+                                        text-anchor="start">100%</text
+                                    >
+                                    <text
+                                        x="578"
+                                        y="50"
+                                        font-size="9"
+                                        fill="#aaa"
+                                        text-anchor="start">50%</text
+                                    >
+                                    <text
+                                        x="578"
+                                        y="94"
+                                        font-size="9"
+                                        fill="#aaa"
+                                        text-anchor="start">0%</text
+                                    >
+
+                                    <polyline
+                                        points={webcamResults
+                                            .map((p, i) => {
+                                                const x =
+                                                    (i /
+                                                        (webcamResults.length -
+                                                            1)) *
+                                                        540 +
+                                                    10;
+                                                const y =
+                                                    96 -
+                                                    (p.confidence ?? 0) * 88;
+                                                return `${x},${y}`;
+                                            })
+                                            .join(" ")}
+                                        fill="none"
+                                        stroke="#555"
+                                        stroke-width="1.5"
+                                    />
+                                    {#each webcamResults as p, i}
+                                        {@const x =
+                                            (i / (webcamResults.length - 1)) *
+                                                540 +
+                                            10}
+                                        {@const y =
+                                            96 - (p.confidence ?? 0) * 88}
+                                        <circle
+                                            cx={x}
+                                            cy={y}
+                                            r="5"
+                                            role="img"
+                                            fill={p.valid_format
+                                                ? "#00e676"
+                                                : "#ff5252"}
+                                            opacity="0.9"
+                                            onmouseenter={(e) => {
+                                                tooltip = {
+                                                    text: p.text,
+                                                    country: p.country ?? "—",
+                                                    confidence: Math.round(
+                                                        (p.confidence ?? 0) *
+                                                            100,
+                                                    ),
+                                                    valid: !!p.valid_format,
+                                                    source: "webcam",
+                                                    timestamp: nowTs(),
+                                                    x: e.clientX,
+                                                    y: e.clientY,
+                                                };
+                                            }}
+                                            onmouseleave={() => {
+                                                tooltip = null;
+                                            }}
+                                        />
+                                    {/each}
+                                </svg>
+                            </div>
+                        {/if}
+
                         <button
                             class="cta"
                             class:stop={webcamActive}

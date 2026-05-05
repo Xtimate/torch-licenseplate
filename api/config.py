@@ -1,4 +1,5 @@
 import os
+from telnetlib import TELNET_PORT
 
 from dotenv import load_dotenv
 
@@ -9,3 +10,5 @@ RECOGNIZER_WEIGHTS = os.getenv("RECOGNIZER_WEIGHTS", "checkpoints/lprnet_best.pt
 DEVICE = os.getenv("DEVICE", "cpu")
 CONF_THRESHOLD = float(os.getenv("CONF_THRESHOLD", "0.3"))
 TEMPERATURE = float(os.getenv("TEMPERATURE", "1.0"))
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
