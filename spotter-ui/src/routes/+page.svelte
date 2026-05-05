@@ -88,7 +88,16 @@
     let webcamActive = $state(false);
     let webcamResults: PlateResult[] = $state([]);
     let frameInterval: ReturnType<typeof setInterval> | null = null;
-
+    let tooltip: {
+        text: string;
+        country: string;
+        confidence: number;
+        valid: boolean;
+        source: string;
+        timestamp: string;
+        x: number;
+        y: number;
+    } | null = $state(null);
     // ───────────────────────────────────────────────────────────
     // Helpers
     // ───────────────────────────────────────────────────────────
@@ -1092,6 +1101,139 @@
                             >
                         </div>
 
+                        {#if historyResult && historyResult.length > 0}
+                            <div class="card" style="padding: 20px;">
+                                <p
+                                    class="muted tiny"
+                                    style="margin-bottom: 12px;"
+                                >
+                                    Confidence over time
+                                </p>
+                                <svg
+                                    width="100%"
+                                    viewBox="0 0 600 120"
+                                    preserveAspectRatio="xMidYMid meet"
+                                    style="display:block;"
+                                >
+                                    <!-- guidelines -->
+                                    <line
+                                        x1="0"
+                                        y1="96"
+                                        x2="572"
+                                        y2="96"
+                                        stroke="var(--muted2)"
+                                        stroke-width="1"
+                                    />
+                                    <line
+                                        x1="0"
+                                        y1="48"
+                                        x2="572"
+                                        y2="48"
+                                        stroke="var(--muted2)"
+                                        stroke-width="0.5"
+                                        stroke-dasharray="4,4"
+                                    />
+                                    <line
+                                        x1="0"
+                                        y1="8"
+                                        x2="572"
+                                        y2="8"
+                                        stroke="var(--muted2)"
+                                        stroke-width="0.5"
+                                        stroke-dasharray="4,4"
+                                    />
+                                    <!-- labels -->
+                                    <text
+                                        x="578"
+                                        y="11"
+                                        font-size="9"
+                                        fill="#aaa"
+                                        text-anchor="start">100%</text
+                                    >
+                                    <text
+                                        x="578"
+                                        y="50"
+                                        font-size="9"
+                                        fill="#aaa"
+                                        text-anchor="start">50%</text
+                                    >
+                                    <text
+                                        x="578"
+                                        y="94"
+                                        font-size="9"
+                                        fill="#aaa"
+                                        text-anchor="start">0%</text
+                                    >
+
+                                    {#if historyResult && historyResult.length > 1}
+                                        {@const reversed = historyResult
+                                            .slice()
+                                            .reverse()}
+                                        <!-- connecting line -->
+                                        <polyline
+                                            points={reversed
+                                                .map((p, i) => {
+                                                    const x =
+                                                        (i /
+                                                            (reversed.length -
+                                                                1)) *
+                                                            540 +
+                                                        10;
+                                                    const y =
+                                                        96 -
+                                                        (p.confidence ?? 0) *
+                                                            88;
+                                                    return `${x},${y}`;
+                                                })
+                                                .join(" ")}
+                                            fill="none"
+                                            stroke="#555"
+                                            stroke-width="1.5"
+                                        />
+                                        <!-- dots -->
+                                        {#each reversed as p, i}
+                                            {@const x =
+                                                (i / (reversed.length - 1)) *
+                                                    540 +
+                                                10}
+                                            {@const y =
+                                                96 - (p.confidence ?? 0) * 88}
+                                            <circle
+                                                cx={x}
+                                                cy={y}
+                                                r="5"
+                                                role="img"
+                                                fill={p.valid_format
+                                                    ? "#00e676"
+                                                    : "#ff5252"}
+                                                opacity="0.9"
+                                                onmouseenter={(e) => {
+                                                    tooltip = {
+                                                        text: p.text,
+                                                        country:
+                                                            p.country ?? "—",
+                                                        confidence: Math.round(
+                                                            (p.confidence ??
+                                                                0) * 100,
+                                                        ),
+                                                        valid: !!p.valid_format,
+                                                        source: p.source,
+                                                        timestamp: p.timestamp,
+                                                        x: e.clientX,
+                                                        y: e.clientY,
+                                                    };
+                                                }}
+                                                onmouseleave={() => {
+                                                    tooltip = null;
+                                                }}
+                                            >
+                                            </circle>
+                                        {/each}
+                                    {/if}
+                                </svg>
+                            </div>
+                        {/if}
+
                         {#if historyResult}
                             <div class="card">
                                 {#if historyResult.length === 0}
@@ -1338,6 +1480,34 @@
             {/key}
         </main>
     </div>
+    {#if tooltip}
+        <div
+            style="
+                position: fixed;
+                left: {tooltip.x + 12}px;
+                top: {tooltip.y - 10}px;
+                background: #1a1a1a;
+                border: 1px solid #333;
+                border-radius: 6px;
+                padding: 10px 14px;
+                font-size: 12px;
+                pointer-events: none;
+                z-index: 9999;
+                min-width: 140px;
+            "
+        >
+            <div style="font-weight: 600; margin-bottom: 6px;">
+                {tooltip.text}
+            </div>
+            <div class="muted tiny">Country: {tooltip.country}</div>
+            <div class="muted tiny">Confidence: {tooltip.confidence}%</div>
+            <div class="muted tiny">
+                Format: {tooltip.valid ? "✓ Valid" : "✗ Invalid"}
+            </div>
+            <div class="muted tiny">Source: {tooltip.source}</div>
+            <div class="muted tiny">{tooltip.timestamp}</div>
+        </div>
+    {/if}
 </div>
 
 <!-- ─── Snippets ──────────────────────────────────────────────── -->
