@@ -9,6 +9,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from api.database import check_watchlist, insert_plate
+from api.notifier import send_telegram_alert
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 import pipeline
@@ -49,6 +50,13 @@ async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
         if watch:
             plate["watchlist_hit"] = True
             plate["watchlist_notes"] = watch.get("notes")
+
+            await send_telegram_alert(
+                text=plate["text"],
+                confidence=plate.get("confidence", 0.0),
+                country=plate.get("country"),
+                notes=watch.get("notes"),
+            )
 
     request.app.state.cache.set(image_hash, result)
     return result

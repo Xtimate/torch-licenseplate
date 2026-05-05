@@ -7,6 +7,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 from api.database import check_watchlist, insert_plate
+from api.notifier import send_telegram_alert
 from detector import detect_from_image  # type: ignore
 from recognizer import is_duplicate, recognize_from_image_onnx  # type: ignore
 
@@ -61,6 +62,12 @@ async def webcam(websocket: WebSocket):
                     if watch:
                         plate["watchlist_hit"] = True
                         plate["watchlist_notes"] = watch.get("notes")
+                        await send_telegram_alert(
+                            text=result.text,
+                            confidence=result.confidence,
+                            country=result.country,
+                            notes=watch.get("notes"),
+                        )
 
                     results.append(plate)
 

@@ -8,6 +8,7 @@ from PIL import Image
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 import recognizer  # type: ignore
 from api.database import check_watchlist, insert_plate
+from api.notifier import send_telegram_alert
 
 router = APIRouter()
 
@@ -51,5 +52,11 @@ async def recognize(request: Request, file: UploadFile = File(...)):
     if watch:
         response["watchlist_hit"] = True
         response["watchlist_notes"] = watch.get("notes")
+        await send_telegram_alert(
+            text=result.text,
+            confidence=result.confidence,
+            country=result.country,
+            notes=watch.get("notes"),
+        )
 
     return response
