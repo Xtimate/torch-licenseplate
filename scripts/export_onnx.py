@@ -1,7 +1,11 @@
+import sys
+
 import torch
 
-from src.dataset import CHARS
-from src.recognizer import LPRNet
+sys.path.insert(0, "src")
+
+from dataset import CHARS  # type: ignore
+from recognizer import LPRNet  # type: ignore
 
 model = LPRNet(num_chars=len(CHARS))
 model.load_state_dict(torch.load("checkpoints/lprnet_best.pth"))
@@ -14,7 +18,7 @@ print("output shape", out.shape)
 print("output sample", out[0, 0, :5])
 torch.onnx.export(
     model,
-    dummy,
+    dummy,  # type: ignore
     "onnx/lprnet.onnx",
     input_names=["input"],
     output_names=["output"],
