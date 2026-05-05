@@ -27,6 +27,7 @@ class RecognitionResult:
     rejection_reason: Optional[str] = None
     valid_format: bool = False
     country: Optional[str] = None
+    min_char_confidence: float = 0.0
 
 
 NL_PATTERNS = [
@@ -44,6 +45,21 @@ DE_PATTERNS = [
 FR_PATTERNS = [
     r"^[A-Z]{2}\d{3}[A-Z]{2}$"  # LL-DDD-LL
 ]
+
+CONFUSIONS = {
+    "0": "D",
+    "D": "0",
+    "1": "7",
+    "7": "1",
+    "8": "B",
+    "B": "8",
+    "5": "S",
+    "S": "5",
+    "2": "Z",
+    "Z": "2",
+    "6": "G",
+    "G": "6",
+}
 
 
 class LPRNet(nn.Module):
@@ -78,6 +94,16 @@ class LPRNet(nn.Module):
         x = x.mean(dim=(2))
         x = x.permute(2, 0, 1)
         return x
+
+
+def _try_confusion_fix(text: str) -> tuple[str, str] | tuple[None, None]:
+    for i, ch in enumerate(text):
+        if ch in CONFUSIONS:
+            candidate = text[:i] + CONFUSIONS[ch] + text[i + 1 :]
+            valid, country = validate_format(candidate)
+            if valid:
+                return candidate, country
+    return None, None
 
 
 def _softmax(x: np.ndarray) -> np.ndarray:
@@ -138,10 +164,13 @@ def recognize_from_image_onnx(
         return RecognitionResult("", 0.0, [], True, "empty_output")
 
     confidence = float(np.mean(char_confs))
-    rejected = confidence < threshold
-    reason = (
-        f"confidence {confidence:.3f} below threshold {threshold}" if rejected else None
-    )
+    min_char_conf = float(min(char_confs))
+    rejected = confidence < threshold or min_char_conf < threshold * 0.6
+    reason = None
+    if confidence < threshold:
+        reason = f"confidence {confidence:.3f} below threshold {threshold}"
+    if min_char_conf < threshold * 0.6:
+        reason = f"min char confidence {min_char_conf:.3f} below threshold {threshold * 0.6:.3f}"
     valid_format, country = validate_format(text)
 
     if not valid_format and _retries < 2:
@@ -162,6 +191,20 @@ def recognize_from_image_onnx(
                 rejection_reason=reason,
                 valid_format=True,
                 country=country_trimmed,
+                min_char_confidence=min_char_conf,
+            )
+    if not valid_format:
+        fixed, fixed_country = _try_confusion_fix(text)
+        if fixed:
+            return RecognitionResult(
+                text=fixed,
+                confidence=confidence,
+                char_confidences=char_confs,
+                rejected=rejected,
+                rejection_reason=reason,
+                valid_format=True,
+                country=fixed_country,
+                min_char_confidence=min_char_conf,
             )
 
     return RecognitionResult(
@@ -172,6 +215,10 @@ def recognize_from_image_onnx(
         rejection_reason=reason,
         valid_format=valid_format,
         country=country,
+        min_char_confidence=min_char_conf,
+    )
+    print(
+        f"  conf={confidence:.3f} min_char={min_char_conf:.3f} rejected={rejected} reason={reason}"
     )
 
 
