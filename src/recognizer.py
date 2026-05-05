@@ -191,6 +191,9 @@ def recognize_from_image_onnx(
     if not char_confs:
         return RecognitionResult("", 0.0, [], True, "empty_output")
 
+    if len(text) < 5:
+        return RecognitionResult(text, 0.0, [], True, "too_short")
+
     confidence = float(np.mean(char_confs))
     min_char_conf = float(min(char_confs))
     rejected = confidence < threshold or min_char_conf < threshold * 0.3
