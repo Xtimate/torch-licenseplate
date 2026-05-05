@@ -10,7 +10,7 @@ from torchvision.transforms.functional import to_tensor
 sys.path.insert(0, "src")
 
 from dataset import CHARS, idx_to_char
-from recognizer import _softmax, load_recognizer_onnx
+from recognizer import _greedy_ctc, _softmax, load_recognizer_onnx
 
 BLANK = len(CHARS) - 1
 
@@ -129,6 +129,80 @@ def evaluate_temperature(session, entries: list, temperature: float) -> float:
     return float(ece)
 
 
+def find_optimal_threshold(
+    session, entries: list, temperature: float
+) -> tuple[float, float]:
+
+    predictions = []
+    for tensor, label in entries:
+        logits = session.run(None, {"input": tensor})[0]
+        logits_2d = logits[:, 0, :]
+        print(f"tensor shape: {tensor.shape}")
+        print(f"temperature: {temperature}, BLANK: {BLANK}")
+        predicted, log_confs = _greedy_ctc(logits_2d, BLANK, temperature)
+
+        if not log_confs:
+            continue
+
+        conf = float(np.mean(log_confs))
+        correct = predicted == label
+        if len(predictions) < 5:
+            print(
+                f"  predicted={predicted!r} label={label!r} match={predicted == label}"
+            )
+        predictions.append((conf, correct))
+
+    if not predictions:
+        return 0.5, 0.0
+
+    confs = [p[0] for p in predictions]
+    print(f"sample confs: {confs[:3]}, types: {[type(c) for c in confs[:3]]}")
+    thresholds = np.linspace(min(confs), max(confs), 50)
+
+    best_threshold = 0.5
+    best_f1 = 0.0
+
+    print(f"\n{'Threshold':>10}  {'Precision':>10}  {'Recall':>8}  {'F1':>8}")
+    print("-" * 44)
+
+    for t in thresholds:
+        accepted = [(conf, correct) for conf, correct in predictions if conf >= t]
+        rejected_correct = sum(
+            1 for conf, correct in predictions if conf < t and correct
+        )
+
+        if not accepted:
+            continue
+
+        tp = sum(1 for _, correct in accepted if correct)
+        fp = sum(1 for _, correct in accepted if not correct)
+
+        fn = rejected_correct
+
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = (
+            2 * (precision * recall) / (precision + recall)
+            if (precision + recall) > 0
+            else 0.0
+        )
+
+        marker = " ←" if f1 > best_f1 else ""
+        print(f"{t:>10.3f}  {precision:>10.3f}  {recall:>8.3f}  {f1:>8.3f}{marker}")
+
+        if f1 > best_f1:
+            best_f1 = f1
+            best_threshold = t
+
+    print(f"Total predictions: {len(predictions)}")
+    print(f"Correct: {sum(1 for _, c in predictions if c)}")
+    print(
+        f"Conf range: {min(p[0] for p in predictions):.3f} - {max(p[0] for p in predictions):.3f}"
+    )
+
+    return best_threshold, best_f1
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="onnx/lprnet.onnx")
@@ -143,7 +217,6 @@ if __name__ == "__main__":
     print(f"Starting temperature search over {len(entries)} entries...")
 
     temperatures = np.linspace(args.t_min, args.t_max, args.steps)
-
     best_t = 1.0
     best_nll = float("inf")
 
@@ -158,5 +231,10 @@ if __name__ == "__main__":
             best_nll = nll
             best_t = t
 
-    print(f"\nBest temperature: {best_t:.2f}  (NLL: {best_nll:.4f})")
-    print(f"Add to .env:\n  TEMPERATURE={best_t:.2f}")
+    print(f"\nBest temperature: {best_t:.2f}  (ECE: {best_nll:.4f})")
+    print(f"\nFinding optimal confidence threshold at T={best_t:.2f}...")
+    best_threshold, best_f1 = find_optimal_threshold(session, entries, best_t)
+    print(f"\nBest threshold: {best_threshold:.3f}  (F1: {best_f1:.4f})")
+    print(f"\nAdd to .env:")
+    print(f"  TEMPERATURE={best_t:.2f}")
+    print(f"  CONF_THRESHOLD={best_threshold:.3f}")

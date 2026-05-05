@@ -36,6 +36,7 @@ NL_PATTERNS = [
     r"^[A-Z]\d{3}[A-Z]{2}$",  # L-DDD-LL
     r"^\d{2}[A-Z]{2}\d{2}$",  # DD-LL-DD
     r"^[A-Z]{2}\d{2}[A-Z]{2}$",  # LL-DD-LL
+    r"^\d{2}[A-Z]{2}[A-Z]{2}$",  # DD-LL-LL
 ]
 DE_PATTERNS = [
     r"^[A-Z]{3}\d{4}$",  # LLL-DD-DD
@@ -44,6 +45,29 @@ DE_PATTERNS = [
 ]
 FR_PATTERNS = [
     r"^[A-Z]{2}\d{3}[A-Z]{2}$"  # LL-DDD-LL
+]
+
+BE_PATTERNS = [
+    r"^\d[A-Z]{3}\d{3}$",  # 1-ABC-234
+]
+
+IT_PATTERNS = [
+    r"^[A-Z]{2}\d{3}[A-Z]{2}$",  # AB-123-CD
+]
+
+PL_PATTERNS = [
+    r"^[A-Z]{2}\d{5}$",  # WA-12345
+    r"^[A-Z]{2}\d{4}[A-Z]$",  # WA-1234-B
+    r"^[A-Z]{3}\d{4}$",  # WAR-1234
+    r"^[A-Z]{3}\d{3}[A-Z]$",  # WAR-123-B
+]
+
+SE_PATTERNS = [
+    r"^[A-Z]{3}\d{3}$",  # ABC-123
+]
+
+ES_PATTERNS = [
+    r"^\d{4}[A-Z]{3}$",  # 1234-ABC
 ]
 
 CONFUSIONS = {
@@ -102,7 +126,7 @@ def _try_confusion_fix(text: str) -> tuple[str, str] | tuple[None, None]:
             candidate = text[:i] + CONFUSIONS[ch] + text[i + 1 :]
             valid, country = validate_format(candidate)
             if valid:
-                return candidate, country
+                return candidate, country  # type: ignore
     return None, None
 
 
@@ -113,15 +137,19 @@ def _softmax(x: np.ndarray) -> np.ndarray:
 
 def _greedy_ctc(logits: np.ndarray, blank, temperature: float = 1.0) -> tuple:
     scaled = logits / temperature
-    probs = _softmax(scaled)
+    probs_full = _softmax(scaled)
+
+    scaled_no_blank = scaled.copy()
+    scaled_no_blank[:, blank] = -1e9
+    probs_no_blank = _softmax(scaled_no_blank)
+
     chars, confs = [], []
     prev = None
-    for t in range(probs.shape[0]):
-        token = int(np.argmax(probs[t]))
-        peak = float(probs[t, token])
+    for t in range(probs_no_blank.shape[0]):
+        token = int(np.argmax(probs_full[t]))
         if token != prev and token != blank:
             chars.append(idx_to_char[token])
-            confs.append(peak)
+            confs.append(float(probs_no_blank[t, token]))
         prev = token
     return "".join(chars), confs
 
@@ -165,7 +193,7 @@ def recognize_from_image_onnx(
 
     confidence = float(np.mean(char_confs))
     min_char_conf = float(min(char_confs))
-    rejected = confidence < threshold or min_char_conf < threshold * 0.6
+    rejected = confidence < threshold or min_char_conf < threshold * 0.3
     reason = None
     if confidence < threshold:
         reason = f"confidence {confidence:.3f} below threshold {threshold}"
@@ -249,16 +277,27 @@ def validate_format(text: str) -> tuple[bool, str | None]:
     for pattern in NL_PATTERNS:
         if re.match(pattern, text):
             return True, "NL"
-    if len(text) > 5:
-        for pattern in NL_PATTERNS:
-            if re.match(pattern, text[:-1]):
-                return False, None
     for pattern in DE_PATTERNS:
         if re.match(pattern, text):
             return True, "DE"
     for pattern in FR_PATTERNS:
         if re.match(pattern, text):
             return True, "FR"
+    for pattern in IT_PATTERNS:
+        if re.match(pattern, text):
+            return True, "IT"
+    for pattern in BE_PATTERNS:
+        if re.match(pattern, text):
+            return True, "BE"
+    for pattern in ES_PATTERNS:
+        if re.match(pattern, text):
+            return True, "ES"
+    for pattern in PL_PATTERNS:
+        if re.match(pattern, text):
+            return True, "PL"
+    for pattern in SE_PATTERNS:
+        if re.match(pattern, text):
+            return True, "SE"
     return False, None
 
 
