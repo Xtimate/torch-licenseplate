@@ -18,7 +18,7 @@ The whole thing runs on a $6/month DigitalOcean droplet with no cloud vision API
 
 ## Why I built it
 
-I wanted to understand how OCR actually works at a low level — not just call an API, but build the full pipeline from synthetic data generation through model training, ONNX export, and production deployment. License plates are a good target because the problem is constrained enough to be tractable but hard enough that naive approaches fail.
+I wanted to understand how OCR actually works at a low level not just call an API, but build the full pipeline from synthetic data generation through model training, ONNX export, and production deployment. License plates are a good target because the problem is constrained enough to be tractable but hard enough that naive approaches fail.
 
 ---
 
