@@ -335,8 +335,8 @@
         previewUrl = canvas.toDataURL("image/jpeg", 0.92);
     }
 
-    function exportCSV() {
-        if (!historyResult || historyResult.length === 0) return;
+    function exportCSV(data: any[], filename: string) {
+        if (!data || data.length === 0) return;
 
         const headers = [
             "text",
@@ -346,7 +346,7 @@
             "source",
             "timestamp",
         ];
-        const rows = historyResult.map((p: any) =>
+        const rows = data.map((p: any) =>
             [
                 p.text ?? "",
                 p.country ?? "",
@@ -362,7 +362,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "spotter_history.csv";
+        a.download = filename;
         a.click();
 
         URL.revokeObjectURL(url);
@@ -562,6 +562,16 @@
                                         {@render plateRow(p)}
                                     {/each}
                                 </div>
+                                <button
+                                    class="cta"
+                                    onclick={() =>
+                                        exportCSV(
+                                            pipelineResult!,
+                                            "spotter_pipeline.csv",
+                                        )}
+                                    style="flex: 0; padding: 14px 20px;"
+                                    >Export CSV</button
+                                >
                                 {#if first.chars && first.chars.length}
                                     <div class="card pad-lg">
                                         <div class="row-between mb12">
@@ -636,7 +646,6 @@
                                     </div>
                                 </div>
                             </div>
-
                             {#if batchResult && Array.isArray(batchResult)}
                                 <div class="batch-list">
                                     {#each batchResult as group, gi}
@@ -1227,7 +1236,11 @@
                             >
                             <button
                                 class="cta"
-                                onclick={exportCSV}
+                                onclick={() =>
+                                    exportCSV(
+                                        historyResult,
+                                        "spotter_history.csv",
+                                    )}
                                 disabled={!historyResult ||
                                     historyResult.length === 0}
                                 style="flex: 0; padding: 14px 20px; "
@@ -1306,7 +1319,7 @@
                                         <!-- connecting line -->
                                         <polyline
                                             points={reversed
-                                                .map((p, i) => {
+                                                .map((p: any, i: any) => {
                                                     const x =
                                                         (i /
                                                             (reversed.length -
