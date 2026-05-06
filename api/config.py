@@ -1,5 +1,4 @@
 import os
-from telnetlib import TELNET_PORT
 
 from dotenv import load_dotenv
 
