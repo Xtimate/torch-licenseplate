@@ -18,7 +18,7 @@ from api.database import (
     reject_review_item,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/queue")
 limiter = Limiter(key_func=get_remote_address)
 
 
