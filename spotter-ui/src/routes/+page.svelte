@@ -28,6 +28,7 @@
         conf: number;
         valid_format?: boolean;
         chars?: number[];
+        char_confidences?: number[];
         latency_ms?: number;
         error?: string;
     }
@@ -159,6 +160,7 @@
     }
     async function runRecognize() {
         recognizeResult = await post("/recognize", recognizeFile);
+        console.log(recognizeResult);
         if (recognizeResult && !recognizeResult.error)
             pushHistory(recognizeResult, "recognize");
     }
@@ -854,10 +856,10 @@
                                         </div>
                                     </div>
                                 </div>
-                                {#if recognizeResult.chars && recognizeResult.chars.length}
+                                {#if recognizeResult.char_confidences && recognizeResult.char_confidences.length}
                                     {@render charConfidence(
                                         recognizeResult.text,
-                                        recognizeResult.chars,
+                                        recognizeResult.char_confidences,
                                     )}
                                 {:else}
                                     <div class="big-plate">
@@ -940,7 +942,7 @@
                                     <div class="card pad row-between">
                                         {@render euPlate(
                                             p.text,
-                                            p.country ?? "FR",
+                                            p.country ?? "??",
                                             "sm",
                                         )}
                                         <div class="col-end">
@@ -1378,7 +1380,7 @@
                                             <div class="history-entry">
                                                 {@render euPlate(
                                                     p.text,
-                                                    p.country ?? "FR",
+                                                    p.country ?? "??",
                                                     "sm",
                                                 )}
                                                 <div class="pr-meta">
@@ -1773,7 +1775,7 @@
 
 {#snippet plateRow(p: PlateResult)}
     <div class="plate-row">
-        {@render euPlate(p.text, p.country ?? "FR")}
+        {@render euPlate(p.text, p.country ?? "??")}
         <div class="pr-meta">
             {#if p.valid_format}
                 <span class="badge ok"
