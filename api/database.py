@@ -74,10 +74,9 @@ def get_history(limit=50, offset=0, country=None, source=None):
 
 def get_stats():
     conn = get_conn()
-
     total = conn.execute("SELECT COUNT(*) FROM plates").fetchone()[0]
     by_country = conn.execute(
-        "SELECT country, COUNT(*) as count FROM plates GROUP BY country DESC ORDER BY count DESC"
+        "SELECT country, COUNT(*) as count FROM plates GROUP BY country ORDER BY count DESC"
     ).fetchall()
     by_source = conn.execute(
         "SELECT source, COUNT(*) as count FROM plates GROUP BY source ORDER BY count DESC"
@@ -93,6 +92,50 @@ def get_stats():
         "total": total,
         "by_country": [dict(r) for r in by_country],
         "by_source": [dict(r) for r in by_source],
+        "top_plates": [dict(r) for r in top_plates],
+        "by_hour": [dict(r) for r in by_hour],
+    }
+
+
+def get_analytics():
+    conn = get_conn()
+    avg_confidence = conn.execute("SELECT AVG(confidence) FROM plates").fetchone()[0]
+    recent_24h = conn.execute(
+        "SELECT COUNT(*) FROM plates WHERE timestamp >= datetime('now', '-24 hours')"
+    ).fetchone()[0]
+    watchlist_hits = conn.execute(
+        "SELECT COUNT(*) FROM plates WHERE text IN (SELECT text FROM watchlist)"
+    ).fetchone()[0]
+    by_day = conn.execute(
+        "SELECT strftime('%Y-%m-%d', timestamp) as day, COUNT(*) as count FROM plates GROUP BY day ORDER BY day DESC LIMIT 30"
+    ).fetchall()
+    confidence_buckets = conn.execute("""
+        SELECT
+            CASE
+                WHEN confidence >= 0.95 THEN '0.95-1.00'
+                WHEN confidence >= 0.90 THEN '0.90-0.95'
+                WHEN confidence >= 0.80 THEN '0.80-0.90'
+                WHEN confidence >= 0.70 THEN '0.70-0.80'
+                ELSE '<0.70'
+            END as bucket,
+            COUNT(*) as count
+        FROM plates
+        GROUP BY bucket
+        ORDER BY bucket DESC
+    """).fetchall()
+    top_plates = conn.execute(
+        "SELECT text, country, COUNT(*) as count FROM plates GROUP BY text ORDER BY count DESC LIMIT 10"
+    ).fetchall()
+    by_hour = conn.execute(
+        "SELECT strftime('%H', timestamp) as hour, COUNT(*) as count FROM plates GROUP BY hour ORDER BY hour"
+    ).fetchall()
+    conn.close()
+    return {
+        "recent_24h": recent_24h,
+        "avg_confidence": round(avg_confidence, 4) if avg_confidence else None,
+        "watchlist_hits": watchlist_hits,
+        "by_day": [dict(r) for r in by_day],
+        "confidence_buckets": [dict(r) for r in confidence_buckets],
         "top_plates": [dict(r) for r in top_plates],
         "by_hour": [dict(r) for r in by_hour],
     }
