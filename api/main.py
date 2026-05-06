@@ -29,7 +29,16 @@ from api.config import (
     TEMPERATURE,
 )
 from api.database import init_db
-from api.routers import detect, history, pipeline, recognize, video, watchlist, webcam
+from api.routers import (
+    detect,
+    history,
+    pipeline,
+    queue,
+    recognize,
+    video,
+    watchlist,
+    webcam,
+)
 from src.detector import load_detector_onnx
 from src.recognizer import load_recognizer_onnx
 
@@ -75,6 +84,8 @@ app.include_router(video.router)
 app.include_router(webcam.router)
 app.include_router(history.router)
 app.include_router(watchlist.router)
+app.include_router(queue.router)
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
 app.add_middleware(

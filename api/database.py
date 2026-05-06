@@ -31,7 +31,19 @@ def init_db():
            text TEXT NOT NULL,
            notes TEXT,
            added_at TEXT DEFAULT (datetime('now'))
-       )
+       );
+
+       CREATE TABLE IF NOT EXISTS review_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            crop BLOB NOT NULL,
+            predicted_text TEXT,
+            confidence REAL,
+            source TEXT,
+            status TEXT DEFAULT 'pending',
+            labeled_text TEXT,
+            added_at TEXT DEFAULT (datetime('now')),
+            reviewed_at TEXT
+       );
    """)
     conn.commit()
     conn.close()
@@ -50,6 +62,93 @@ def insert_plate(text, country, confidence, valid_format, source, crop_bytes=Non
     row_id = cur.lastrowid
     conn.close()
     return row_id
+
+
+def maybe_queue_for_review(
+    predicted_text, confidence, source, crop_bytes, threshold=1.0
+):
+    if confidence >= threshold or crop_bytes is None:
+        return
+    conn = get_conn()
+    conn.execute(
+        """
+        INSERT INTO review_queue (crop, predicted_text, confidence, source)
+        VALUES (?, ?, ?, ?)
+    """,
+        (crop_bytes, predicted_text, confidence, source),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_review_queue(limit=20, offset=0):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, predicted_text, confidence, source, status, added_at FROM review_queue ORDER BY confidence ASC LIMIT ? OFFSET ?",
+        (limit, offset),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_review_item_crop(item_id: int):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT crop FROM review_queue WHERE id = ?",
+        (item_id,),
+    ).fetchone()
+    conn.close()
+    return row["crop"] if row else None
+
+
+def label_review_item(item_id: int, labeled_text: str):
+    conn = get_conn()
+    conn.execute(
+        """UPDATE review_queue SET status = 'labeled', labeled_text = ?, reviewed_at = datetime('now') WHERE id = ?""",
+        (labeled_text.upper().strip(), item_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def reject_review_item(item_id: int):
+    conn = get_conn()
+    conn.execute(
+        """UPDATE review_queue SET status = 'rejected', reviewed_at = datetime('now') WHERE id = ?""",
+        (item_id,),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_labeled_items():
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, crop, labeled_text, confidence, source FROM review_queue WHERE status = 'labeled' ORDER BY added_at ASC"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_queue_stats():
+    conn = get_conn()
+    total = conn.execute("SELECT COUNT(*) FROM review_queue").fetchone()[0]
+    pending = conn.execute(
+        "SELECT COUNT(*) FROM review_queue WHERE status = 'pending'"
+    ).fetchone()[0]
+    labeled = conn.execute(
+        "SELECT COUNT(*) FROM review_queue WHERE status = 'labeled'"
+    ).fetchone()[0]
+    rejected = conn.execute(
+        "SELECT COUNT(*) FROM review_queue WHERE status = 'rejected'"
+    ).fetchone()[0]
+    conn.close()
+    return {
+        "total": total,
+        "pending": pending,
+        "labeled": labeled,
+        "rejected": rejected,
+    }
 
 
 def get_history(limit=50, offset=0, country=None, source=None):

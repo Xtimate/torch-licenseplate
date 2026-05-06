@@ -8,7 +8,7 @@ from PIL import Image
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from api.database import check_watchlist, insert_plate
+from api.database import check_watchlist, insert_plate, maybe_queue_for_review
 from api.notifier import send_telegram_alert
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
@@ -46,6 +46,14 @@ async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
             valid_format=plate.get("valid_format", False),
             source="pipeline",
         )
+
+        maybe_queue_for_review(
+            predicted_text=plate["text"],
+            confidence=plate.get("confidence", 0.0),
+            source="pipeline",
+            crop_bytes=contents,
+        )
+
         watch = check_watchlist(plate["text"])
         if watch:
             plate["watchlist_hit"] = True
