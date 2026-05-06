@@ -87,6 +87,7 @@
     let ws: WebSocket | null = null;
     let webcamActive = $state(false);
     let webcamResults: PlateResult[] = $state([]);
+    let analyticsResult: any = $state(null);
     let frameInterval: ReturnType<typeof setInterval> | null = null;
     let tooltip: {
         text: string;
@@ -261,6 +262,11 @@
         statsResult = await res.json();
     }
 
+    async function loadAnalytics() {
+        const res = await fetch(`${API_BASE}/analytics`);
+        analyticsResult = await res.json();
+    }
+
     async function loadWatchlist() {
         const res = await fetch(`${API_BASE}/watchlist`);
         watchlistResult = await res.json();
@@ -398,7 +404,9 @@
                         class:active={activeTab === m.id}
                         onclick={() => setTab(m.id)}
                     >
-                        <span class="mode-num">0{idx + 1}</span>
+                        <span class="mode-num"
+                            >{String(idx + 1).padStart(2, "0")}</span
+                        >
                         <div class="mode-text">
                             <div class="mode-label">{m.label}</div>
                             <div class="mode-hint">{m.hint}</div>
@@ -855,7 +863,7 @@
                                     <div class="big-plate">
                                         {@render euPlate(
                                             recognizeResult.text,
-                                            recognizeResult.country ?? "FR",
+                                            recognizeResult.country ?? "??",
                                         )}
                                     </div>
                                 {/if}
@@ -1414,7 +1422,9 @@
                             <div class="mode-meta">
                                 <span class="mode-meta-num">MODE / 07</span>
                                 <span class="muted2 tiny">GET</span>
-                                <span class="muted tiny mono">/stats</span>
+                                <span class="muted tiny mono"
+                                    >/stats · /analytics</span
+                                >
                             </div>
                             <h2 class="mode-title">Stats</h2>
                             <p class="mode-desc">
@@ -1422,9 +1432,175 @@
                             </p>
                         </header>
 
-                        <button class="cta" onclick={loadStats}
-                            >Load stats</button
-                        >
+                        <div class="action-row">
+                            <button class="cta" onclick={loadStats}
+                                >Load stats</button
+                            >
+                            <button class="cta" onclick={loadAnalytics}
+                                >Load analytics</button
+                            >
+                        </div>
+
+                        {#if analyticsResult}
+                            <div class="grid-2">
+                                <div class="card pad">
+                                    <div class="section-label mb12">
+                                        Overview
+                                    </div>
+                                    <div class="row-between mt8">
+                                        <span class="muted">Total plates</span>
+                                        <span class="accent bold"
+                                            >{analyticsResult.total ??
+                                                statsResult?.total ??
+                                                "—"}</span
+                                        >
+                                    </div>
+                                    <div class="row-between mt8">
+                                        <span class="muted">Last 24h</span>
+                                        <span class="accent bold"
+                                            >{analyticsResult.recent_24h}</span
+                                        >
+                                    </div>
+                                    <div class="row-between mt8">
+                                        <span class="muted">Avg confidence</span
+                                        >
+                                        <span class="accent bold">
+                                            {analyticsResult.avg_confidence !=
+                                            null
+                                                ? Math.round(
+                                                      analyticsResult.avg_confidence *
+                                                          100,
+                                                  ) + "%"
+                                                : "—"}
+                                        </span>
+                                    </div>
+                                    <div class="row-between mt8">
+                                        <span class="muted">Watchlist hits</span
+                                        >
+                                        <span
+                                            class="accent bold"
+                                            class:bad={analyticsResult.watchlist_hits >
+                                                0}
+                                        >
+                                            {analyticsResult.watchlist_hits}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="card pad">
+                                    <div class="section-label mb12">
+                                        Confidence distribution
+                                    </div>
+                                    {#each analyticsResult.confidence_buckets as b}
+                                        <div class="row-between mt8">
+                                            <span class="muted mono tiny"
+                                                >{b.bucket}</span
+                                            >
+                                            <span class="accent bold"
+                                                >{b.count}</span
+                                            >
+                                        </div>
+                                    {/each}
+                                </div>
+                            </div>
+
+                            <div class="card pad">
+                                <div class="section-label mb12">Top plates</div>
+                                {#each analyticsResult.top_plates as p}
+                                    <div class="row-between mt8">
+                                        <span class="accent bold mono"
+                                            >{p.text}</span
+                                        >
+                                        <div
+                                            style="display:flex; gap:12px; align-items:center;"
+                                        >
+                                            <span class="muted tiny"
+                                                >{COUNTRIES[p.country ?? ""] ??
+                                                    p.country ??
+                                                    "?"}</span
+                                            >
+                                            <span class="muted tiny"
+                                                >{p.count}x</span
+                                            >
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+
+                            {#if analyticsResult.by_day?.length > 0}
+                                <div class="card pad">
+                                    <div class="section-label mb12">
+                                        Plates per day · last 30 days
+                                    </div>
+                                    <div class="cc-row">
+                                        {#each analyticsResult.by_day
+                                            .slice()
+                                            .reverse() as d}
+                                            {@const maxCount = Math.max(
+                                                ...analyticsResult.by_day.map(
+                                                    (x: any) => x.count,
+                                                ),
+                                            )}
+                                            <div class="cc-col">
+                                                <span class="cc-pct"
+                                                    >{d.count}</span
+                                                >
+                                                <div class="cc-bar">
+                                                    <div
+                                                        class="cc-fill"
+                                                        style="height: {Math.round(
+                                                            (d.count /
+                                                                maxCount) *
+                                                                100,
+                                                        )}%"
+                                                    ></div>
+                                                </div>
+                                                <span
+                                                    class="cc-ch"
+                                                    style="font-size:7px;"
+                                                    >{d.day.slice(5)}</span
+                                                >
+                                            </div>
+                                        {/each}
+                                    </div>
+                                </div>
+                            {/if}
+
+                            {#if analyticsResult.by_hour?.length > 0}
+                                <div class="card pad">
+                                    <div class="section-label mb12">
+                                        Sightings by hour
+                                    </div>
+                                    <div class="cc-row">
+                                        {#each analyticsResult.by_hour as h}
+                                            {@const maxCount = Math.max(
+                                                ...analyticsResult.by_hour.map(
+                                                    (x: any) => x.count,
+                                                ),
+                                            )}
+                                            <div class="cc-col">
+                                                <span class="cc-pct"
+                                                    >{h.count}</span
+                                                >
+                                                <div class="cc-bar">
+                                                    <div
+                                                        class="cc-fill"
+                                                        style="height: {Math.round(
+                                                            (h.count /
+                                                                maxCount) *
+                                                                100,
+                                                        )}%"
+                                                    ></div>
+                                                </div>
+                                                <span class="cc-ch"
+                                                    >{h.hour}</span
+                                                >
+                                            </div>
+                                        {/each}
+                                    </div>
+                                </div>
+                            {/if}
+                        {/if}
 
                         {#if statsResult}
                             <div class="grid-2">
@@ -1460,66 +1636,6 @@
                                     {/each}
                                 </div>
                             </div>
-
-                            <div class="card pad">
-                                <div class="section-label mb12">
-                                    Top plates · {statsResult.total} total
-                                </div>
-                                {#each statsResult.top_plates as p}
-                                    <div class="row-between mt8">
-                                        <span class="accent bold mono"
-                                            >{p.text}</span
-                                        >
-                                        <div
-                                            style="display:flex; gap:12px; align-items:center;"
-                                        >
-                                            <span class="muted tiny"
-                                                >{COUNTRIES[p.country ?? ""] ??
-                                                    p.country ??
-                                                    "?"}</span
-                                            >
-                                            <span class="muted tiny"
-                                                >{p.count}x</span
-                                            >
-                                        </div>
-                                    </div>
-                                {/each}
-                            </div>
-
-                            {#if statsResult.by_hour.length > 0}
-                                <div class="card pad">
-                                    <div class="section-label mb12">
-                                        Sightings by hour
-                                    </div>
-                                    <div class="cc-row">
-                                        {#each statsResult.by_hour as h}
-                                            {@const maxCount = Math.max(
-                                                ...statsResult.by_hour.map(
-                                                    (x: any) => x.count,
-                                                ),
-                                            )}
-                                            <div class="cc-col">
-                                                <span class="cc-pct"
-                                                    >{h.count}</span
-                                                >
-                                                <div class="cc-bar">
-                                                    <div
-                                                        class="cc-fill"
-                                                        style="height: {Math.round(
-                                                            (h.count /
-                                                                maxCount) *
-                                                                100,
-                                                        )}%"
-                                                    ></div>
-                                                </div>
-                                                <span class="cc-ch"
-                                                    >{h.hour}</span
-                                                >
-                                            </div>
-                                        {/each}
-                                    </div>
-                                </div>
-                            {/if}
                         {/if}
 
                         <!-- ─── Watchlist ───────────────────────────── -->

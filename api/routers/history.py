@@ -15,6 +15,7 @@ limiter = Limiter(key_func=get_remote_address)
 @router.get("/history")
 @limiter.limit("20/minute")
 def history(
+    request: Request,
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
     country: str = Query(default=None),
