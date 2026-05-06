@@ -30,7 +30,9 @@ async def webcam(websocket: WebSocket):
             results = []
             for det in detections:
                 crop = image.crop((det["x1"], det["y1"], det["x2"], det["y2"]))
-                result = recognize_from_image_onnx(crop, recognizer)
+                result = recognize_from_image_onnx(
+                    crop, recognizer, threshold=conf, temperature=app.state.temperature
+                )
                 if result.rejected or not result.text:
                     continue
                 if not is_duplicate(result.text, seen_plates):
