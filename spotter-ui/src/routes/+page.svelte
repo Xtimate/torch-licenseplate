@@ -102,6 +102,7 @@
     let retrainSecret = $state("");
     let retrainEpochs = $state("20");
     let retrainStatus = $state("");
+    let modelVersions: any = $state(null);
 
     let tooltip: {
         text: string;
@@ -116,6 +117,11 @@
     // ───────────────────────────────────────────────────────────
     // Helpers
     // ───────────────────────────────────────────────────────────
+    async function loadModelVersions() {
+        const res = await fetch(`${API_BASE}/models`);
+        modelVersions = await res.json();
+    }
+
     async function triggerRetrain() {
         retrainStatus = "Starting retrain...";
         const res = await fetch(`${API_BASE}/retrain`, {
@@ -1513,6 +1519,96 @@
                                 >Load analytics</button
                             >
                         </div>
+                        <button class="cta" onclick={loadModelVersions}
+                            >Load model versions</button
+                        >
+
+                        {#if modelVersions}
+                            <div class="card pad">
+                                <div class="section-label mb12">
+                                    Active model
+                                </div>
+                                {#if modelVersions.active}
+                                    <div class="row-between mt8">
+                                        <span class="muted mono tiny"
+                                            >{modelVersions.active
+                                                .filename}</span
+                                        >
+                                        <span class="ok bold">● live</span>
+                                    </div>
+                                    <div class="row-between mt8">
+                                        <span class="muted">Loss</span>
+                                        <span class="accent bold"
+                                            >{modelVersions.active.loss?.toFixed(
+                                                4,
+                                            ) ?? "—"}</span
+                                        >
+                                    </div>
+                                    <div class="row-between mt8">
+                                        <span class="muted"
+                                            >Labeled samples used</span
+                                        >
+                                        <span class="accent bold"
+                                            >{modelVersions.active
+                                                .labeled_samples}</span
+                                        >
+                                    </div>
+                                    <div class="row-between mt8">
+                                        <span class="muted">Deployed</span>
+                                        <span class="muted tiny"
+                                            >{modelVersions.active
+                                                .deployed_at}</span
+                                        >
+                                    </div>
+                                {:else}
+                                    <div class="empty">
+                                        No model registered yet — retrain to
+                                        create a version.
+                                    </div>
+                                {/if}
+                            </div>
+
+                            {#if modelVersions.history.length > 1}
+                                <div class="card pad">
+                                    <div class="section-label mb12">
+                                        Version history
+                                    </div>
+                                    {#each modelVersions.history as v}
+                                        <div
+                                            class="row-between mt8"
+                                            style="border-bottom: 1px solid var(--line); padding-bottom: 8px;"
+                                        >
+                                            <div
+                                                style="display:flex; flex-direction:column; gap:2px;"
+                                            >
+                                                <span class="mono tiny accent"
+                                                    >{v.filename}</span
+                                                >
+                                                <span class="muted2 tiny"
+                                                    >{v.deployed_at}</span
+                                                >
+                                            </div>
+                                            <div
+                                                style="display:flex; gap:12px; align-items:center;"
+                                            >
+                                                <span class="muted tiny"
+                                                    >loss {v.loss?.toFixed(4) ??
+                                                        "—"}</span
+                                                >
+                                                <span class="muted tiny"
+                                                    >{v.labeled_samples} samples</span
+                                                >
+                                                {#if v.is_active}
+                                                    <span class="ok tiny"
+                                                        >● active</span
+                                                    >
+                                                {/if}
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            {/if}
+                        {/if}
 
                         {#if analyticsResult}
                             <div class="grid-2">
