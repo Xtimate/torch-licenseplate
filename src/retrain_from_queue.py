@@ -124,6 +124,27 @@ if __name__ == "__main__":
     print(f"  Running: {' '.join(retrain_cmd)}\n")
     subprocess.run(retrain_cmd, check=True)
 
-    print("\n── Done ──")
-    print("  Model retrained. Run scripts/export_onnx.py to export to ONNX,")
-    print("  then deploy to the droplet.")
+    print("\n── Step 4: Export to ONNX ──")
+        export_cmd = [
+            sys.executable,
+            "scripts/export_onnx.py",
+        ]
+        print(f"  Running: {' '.join(export_cmd)}\n")
+        subprocess.run(export_cmd, check=True)
+
+        print("\n── Step 5: Reload model in running service ──")
+        # Signal the systemd service to restart and pick up the new ONNX model
+        # Only runs if the service exists (i.e. on the droplet, not locally)
+        result = subprocess.run(
+            ["systemctl", "is-active", "spotter"],
+            capture_output=True, text=True
+        )
+        if result.stdout.strip() == "active":
+            subprocess.run(["systemctl", "restart", "spotter"], check=True)
+            print("  Service restarted — new model is live.")
+        else:
+            print("  Spotter service not running — skipping restart.")
+            print("  Manually run: systemctl restart spotter")
+
+        print("\n── Done ──")
+        print("  New model is live at onnx/lprnet.onnx")
