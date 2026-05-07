@@ -240,6 +240,25 @@
             letter-spacing: 1px;
             text-transform: uppercase;
         }
+
+        .scan-header {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--line);
+            flex-shrink: 0;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 4px;
+        }
     </style>
 </head>
 <body>
@@ -295,7 +314,37 @@
             </div>
         </div>
 
-        <div id="scan" class="screen"></div>
+        <div id="scan" class="screen">
+            <div class="scan-header">
+                <button class="back-btn" onclick="stopScan()">‹</button>
+                <div class="scan-title">Scan Plate</div>
+            </div>
+
+            <div class="camera-area">
+                <video id="scan-video" autoplay playsinline muted></video>
+                <canvas id="scan-canvas"></canvas>
+                <div class="camera-overlay">
+                    <div class="finder">
+                        <div class="finder-corner tl"></div>
+                        <div class="finder-corner tr"></div>
+                        <div class="finder-corner bl"></div>
+                        <div class="finder-corner br"></div>
+                    </div>
+                    <div class="scan-hint">Align plate within brackets</div>
+                </div>
+            </div>
+
+            <div class="scan-controls">
+                <div class="scan-result" id="scan-result"></div>
+                <button
+                    class="capturn-btn"
+                    id="capture-btn"
+                    onclick="captureAndRecognize()"
+                >
+                    Capture
+                </button>
+            </div>
+        </div>
         <div id="live" class="screen"></div>
         <div id="history" class="screen"></div>
     </div>
