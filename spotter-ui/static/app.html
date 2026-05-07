@@ -1,0 +1,336 @@
+<!doctype html>
+<head>
+    <meta charset="UTF-8" />
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black_out" />
+    <meta name="apple-mobile-web-app-title" content="Spotter" />
+    <title>Spotter App</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet"
+    />
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --fg: #f0ede6;
+            --accent: #e8c84a;
+            --mute: rgba(240, 237, 230, 0.4);
+            --mute2: rgba(240, 237, 230, 0.18);
+            --line: rgba(240, 237, 230, 0.08);
+            --card: rgba(240, 237, 230, 0.04);
+            --good: #22c55e;
+            --bad: #ef4444;
+            --radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: "DM Mono", monospace;
+            min-height: 100dvh;
+            overflow-x: hidden;
+        }
+
+        #app {
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        .topbar {
+            padding: 16px 20px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-mark {
+            width: 26px;
+            height: 26px;
+            border: 2px solid var(--accent);
+            border-radius: 5px;
+            position: relative;
+        }
+
+        .brand-mark::before {
+            top: 2px;
+            left: 2px;
+        }
+        .brand-mark::after {
+            bottom: 2px;
+            right: 2px;
+        }
+
+        .brand-title {
+            font-family: "Syne", sans-serif;
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-sub {
+            font-size: 9px;
+            color: var(--mute);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .history-btn {
+            background: none;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            color: var(--mute);
+            font-family: "DM Mono", monospace;
+            font-size: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 6px 12px;
+            cursor: pointer;
+        }
+
+        .hero {
+            padding: 40px 20px 32px;
+            text-align: center;
+        }
+
+        .hero-eyebrow {
+            font-size: 9px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 12px;
+        }
+
+        .hero-title {
+            font-family: "Syne", sans-serif;
+            font-size: 52px;
+            font-weight: 800;
+            letter-spacing: -2px;
+            line-height: 1;
+        }
+
+        .hero-title.span {
+            margin-top: 12px;
+            font-size: 11px;
+            color: var(--mute);
+            line-height: 1.6;
+        }
+
+        .mode-cards {
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .mode-card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 22px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .mode-card:active {
+            opacity: 0.7;
+        }
+
+        .mode-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: rgba(232, 200, 74, 0.1);
+            border: 1px solid rgba(232, 200, 74, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .mode-info {
+            flex: 1;
+        }
+
+        .mode-label {
+            font-family: "Syne", sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .mode-hint {
+            font-size: 10px;
+            color: var(--mute);
+        }
+
+        .mode-arrow {
+            color: var(--accent);
+            font-size: 20px;
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 20px;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--good);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .dot.red {
+            background: var(--bad);
+        }
+
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .status-text {
+            font-size: 10px;
+            color: var(--mute);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="home" class="screen active">
+            <div class="topbar">
+                <div class="brand">
+                    <div class="brand-mark"></div>
+                    <div>
+                        <div class="brand-title">Spotter</div>
+                        <div class="brand-sub">ALPR · Mobile</div>
+                    </div>
+                </div>
+                <button class="history-btn" onclick="showScreen('history')">
+                    History
+                </button>
+            </div>
+            <div class="hero">
+                <div class="hero-eyebrow">License Plate Recognition</div>
+                <div class="hero-title">Spot<span>.</span></div>
+                <div class="hero-sub">
+                    Point your camera at a plate.<br />Get the text instantly.
+                </div>
+            </div>
+
+            <div class="mode-cards">
+                <div class="mode-card" onclick="showScreen('scan')">
+                    <div class="mode-icon">📷</div>
+                    <div class="mode-info">
+                        <div class="mode-label">Scan</div>
+                        <div class="mode-hint">
+                            Single shot · tap to capture
+                        </div>
+                    </div>
+                    <div class="mode-arrow">›</div>
+                </div>
+
+                <div class="mode-card" onlick="showScreen('live')">
+                    <div class="mode-icon">📡</div>
+                    <div class="mode-info">
+                        <div class="mode-label">Live</div>
+                        <div class="mode-hint">
+                            Stream frames · real-time detection
+                        </div>
+                    </div>
+                    <div class="mode-arrow">›</div>
+                </div>
+            </div>
+
+            <div class="status-row">
+                <div class="dot" id="api-dot"></div>
+                <span class="status-text" id="api-status">Checking API...</span>
+            </div>
+        </div>
+
+        <div id="scan" class="screen"></div>
+        <div id="live" class="screen"></div>
+        <div id="history" class="screen"></div>
+    </div>
+
+    <script>
+        const API = "https://api.xtimate.tech";
+
+        function showScreen(id) {
+            document.querySelectorAll(".screen").forEach((s) => {
+                s.classList.remove("active");
+            });
+            document.getElementById(id).classList.add("active");
+        }
+
+        async function checkApi() {
+            try {
+                const res = await fetch(`${API}/health`, {
+                    signal: AbortSignal.timeout(4000),
+                });
+                const data = await res.json();
+                console.log(data);
+                const ok = data.status === "ok";
+                document.getElementById("api-dot").className =
+                    "dot" + (ok ? "" : " red");
+                document.getElementById("api-status").textContent = ok
+                    ? "API · Online"
+                    : "API · Degraded";
+            } catch {
+                document.getElementById("api-dot").className = "dot red";
+                document.getElementById("api-status").textContent =
+                    "API · Offline";
+            }
+        }
+
+        checkApi();
+        setInterval(checkApi, 30000);
+    </script>
+</body>
