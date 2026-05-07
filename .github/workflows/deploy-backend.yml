@@ -1,0 +1,35 @@
+name: Deploy Backend to Droplet
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "api/**"
+      - "src/**"
+      - "scripts/**"
+      - "requirements.txt"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to droplet via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 167.172.42.12
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            cd ~/torch-licenseplate
+
+            git pull origin master
+
+            source venv/bin/activate
+            pip install -r requirements.txt --break-system-packages --quiet
+
+            systemctl restart spotter
+
+            sleep 3
+
+            systemctl is-active spotter && echo "✓ Service is running" || echo "✗ Service failed to start"
