@@ -35,6 +35,7 @@ from api.routers import (
     pipeline,
     queue,
     recognize,
+    retrain,
     video,
     watchlist,
     webcam,
@@ -85,6 +86,7 @@ app.include_router(webcam.router)
 app.include_router(history.router)
 app.include_router(watchlist.router)
 app.include_router(queue.router)
+app.include_router(retrain.router)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore

@@ -99,6 +99,9 @@
     let reviewQueue: any[] = $state([]);
     let reviewInputs: Record<number, string> = $state({});
     let reviewLoading = $state(false);
+    let retrainSecret = $state("");
+    let retrainEpochs = $state("20");
+    let retrainStatus = $state("");
 
     let tooltip: {
         text: string;
@@ -113,6 +116,24 @@
     // ───────────────────────────────────────────────────────────
     // Helpers
     // ───────────────────────────────────────────────────────────
+    async function triggerRetrain() {
+        retrainStatus = "Starting retrain...";
+        const res = await fetch(`${API_BASE}/retrain`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                secret: retrainSecret,
+                epochs: parseInt(retrainEpochs) || 20,
+            }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            retrainStatus = data.message;
+        } else {
+            retrainStatus = `Error: ${data.detail}`;
+        }
+    }
+
     function nowTs() {
         const d = new Date();
         return [d.getHours(), d.getMinutes(), d.getSeconds()]
@@ -285,7 +306,7 @@
     }
 
     async function loadReviewQueue() {
-        const res = await fetch(`${API_BASE}/queue`);
+        const res = await fetch(`${API_BASE}/review`);
         reviewQueue = await res.json();
         reviewInputs = Object.fromEntries(
             reviewQueue.map((item: any) => [item.id, ""]),
@@ -1713,6 +1734,29 @@
                                 >
                             {/if}
                         </div>
+                        <div class="action-row" style="margin-top: 16px;">
+                            <input
+                                class="text-input"
+                                placeholder="Secret key"
+                                bind:value={retrainSecret}
+                                type="password"
+                                style="flex: 1;"
+                            />
+                            <input
+                                class="text-input"
+                                placeholder="Epochs (default 20)"
+                                bind:value={retrainEpochs}
+                                style="flex: 0; width: 80px;"
+                            />
+                            <button
+                                class="cta"
+                                style="flex: 0;"
+                                onclick={triggerRetrain}>Retrain</button
+                            >
+                        </div>
+                        {#if retrainStatus}
+                            <div class="muted tiny mt8">{retrainStatus}</div>
+                        {/if}
 
                         {#if reviewQueue.length > 0}
                             <div class="result-list" style="gap: 12px;">
