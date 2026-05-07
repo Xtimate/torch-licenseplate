@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from api.config import RETRAIN_SECRET
+from api.database import get_active_model_version, get_model_versions
 
 router = APIRouter()
 
@@ -29,4 +30,12 @@ async def retrain(body: RetrainRequest, request: Request):
     return {
         "ok": True,
         "message": f"Retraining started for {body.epochs} epochs. Check server logs for progress.",
+    }
+
+
+@router.get("/models")
+async def model_versions(request: Request):
+    return {
+        "active": get_active_model_version(),
+        "history": get_model_versions(),
     }

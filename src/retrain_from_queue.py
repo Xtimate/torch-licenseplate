@@ -125,26 +125,57 @@ if __name__ == "__main__":
     subprocess.run(retrain_cmd, check=True)
 
     print("\n── Step 4: Export to ONNX ──")
-        export_cmd = [
-            sys.executable,
-            "scripts/export_onnx.py",
-        ]
-        print(f"  Running: {' '.join(export_cmd)}\n")
-        subprocess.run(export_cmd, check=True)
+    export_cmd = [
+        sys.executable,
+        "scripts/export_onnx.py",
+    ]
+    print(f"  Running: {' '.join(export_cmd)}\n")
+    subprocess.run(export_cmd, check=True)
 
-        print("\n── Step 5: Reload model in running service ──")
-        # Signal the systemd service to restart and pick up the new ONNX model
-        # Only runs if the service exists (i.e. on the droplet, not locally)
-        result = subprocess.run(
-            ["systemctl", "is-active", "spotter"],
-            capture_output=True, text=True
-        )
-        if result.stdout.strip() == "active":
-            subprocess.run(["systemctl", "restart", "spotter"], check=True)
-            print("  Service restarted — new model is live.")
-        else:
-            print("  Spotter service not running — skipping restart.")
-            print("  Manually run: systemctl restart spotter")
+    print("\n── Step 5: Reload model in running service ──")
+    # Signal the systemd service to restart and pick up the new ONNX model
+    # Only runs if the service exists (i.e. on the droplet, not locally)
+    result = subprocess.run(
+        ["systemctl", "is-active", "spotter"], capture_output=True, text=True
+    )
+    if result.stdout.strip() == "active":
+        subprocess.run(["systemctl", "restart", "spotter"], check=True)
+        print("  Service restarted — new model is live.")
+    else:
+        print("  Spotter service not running — skipping restart.")
+        print("  Manually run: systemctl restart spotter")
 
         print("\n── Done ──")
         print("  New model is live at onnx/lprnet.onnx")
+        print("\n── Step 4b: Register model version ──")
+        # Read the best loss from the training run
+        # train_recognizer.py saves it to checkpoints/best_loss.txt
+        loss = None
+        loss_path = "checkpoints/best_loss.txt"
+        if os.path.exists(loss_path):
+            with open(loss_path) as f:
+                loss = float(f.read().strip())
+
+        from api.database import get_labeled_items, register_model_version
+
+        labeled_count = len(get_labeled_items())
+
+        # Version filename based on timestamp
+        from datetime import datetime
+
+        version_name = f"lprnet_{datetime.now().strftime('%Y%m%d_%H%M%S')}.onnx"
+
+        # Copy the exported ONNX to a versioned backup
+        import shutil
+
+        os.makedirs("onnx/versions", exist_ok=True)
+        shutil.copy("onnx/lprnet.onnx", f"onnx/versions/{version_name}")
+
+        register_model_version(
+            filename=version_name,
+            loss=loss or 0.0,
+            labeled_samples=labeled_count,
+        )
+        print(
+            f"  Registered version: {version_name} (loss={loss}, samples={labeled_count})"
+        )

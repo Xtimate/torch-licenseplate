@@ -44,6 +44,15 @@ def init_db():
             added_at TEXT DEFAULT (datetime('now')),
             reviewed_at TEXT
        );
+
+       CREATE TABLE IF NOT EXISTS model_versions (
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
+           filename TEXT NOT NULL,
+           loss REAL,
+           labeled_samples INTEGER,
+           deployed_at TEXT DEFAULT (datetime('now')),
+           is_active INTEGER DEFAULT 0
+       );
    """)
     conn.commit()
     conn.close()
@@ -238,6 +247,37 @@ def get_analytics():
         "top_plates": [dict(r) for r in top_plates],
         "by_hour": [dict(r) for r in by_hour],
     }
+
+
+def register_model_version(filename: str, loss: float, labeled_samples: int):
+    conn = get_conn()
+    conn.execute("UPDATE model_versions SET is_active = 0")
+
+    conn.execute(
+        """
+        INSERT INTO model_versions (filename, loss, labeled_samples, is_active)
+        VALUES (?, ?, ?, 1)
+        """,
+        (filename, loss, labeled_samples),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_model_versions():
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM model_versions ORDER BY deployed_at DESC"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_active_model_version():
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM model_versions WHERE is_active = 1").fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def check_watchlist(text):

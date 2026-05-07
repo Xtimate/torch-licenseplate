@@ -110,6 +110,8 @@ if __name__ == "__main__":
         if avg_loss < best_loss:
             best_loss = avg_loss
             torch.save(model.state_dict(), best_checkpoint_path)
+            with open("checkpoints/best_loss.txt", "w") as f:
+                f.write(str(best_loss))
             print(f"  ★ New best ({best_loss:.4f}) -> checkpoints/lprnet_best.pth")
 
         # --- Per-epoch sample decode (5 plates) ---
