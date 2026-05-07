@@ -20,7 +20,8 @@
         | "history"
         | "stats"
         | "watchlist"
-        | "review";
+        | "review"
+        | "map";
 
     interface PlateResult {
         text: string;
@@ -56,6 +57,7 @@
             label: "Review Queue",
             hint: "Label low-confidence plates",
         },
+        { id: "map", label: "Map", hint: "Plate sightings on a map" },
     ];
 
     const COUNTRIES: Record<string, string> = {
@@ -103,6 +105,16 @@
     let retrainEpochs = $state("20");
     let retrainStatus = $state("");
     let modelVersions: any = $state(null);
+    let mapContainer: HTMLDivElement | null = $state(null);
+    let mapInstance: any = null;
+    let heatmapData: any[] = $state([]);
+    let mapLoaded = $state(false);
+    let locationLat: string = $state("");
+    let locationLng: string = $state("");
+    let locationName: string = $state("");
+    let useGeolocation = $state(false);
+    let plateSearch = $state("");
+    let plateHistory: any[] = $state([]);
 
     let tooltip: {
         text: string;
@@ -117,9 +129,90 @@
     // ───────────────────────────────────────────────────────────
     // Helpers
     // ───────────────────────────────────────────────────────────
+    async function requestGeolocation() {
+        return new Promise<void>((resolve, reject) => {
+            if (!navigator.geolocation) {
+                reject(new Error("Geolocation not supported"));
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    locationLat = String(pos.coords.latitude);
+                    locationLng = String(pos.coords.longitude);
+                    resolve();
+                },
+                (err) => reject(err),
+            );
+        });
+    }
+
     async function loadModelVersions() {
         const res = await fetch(`${API_BASE}/models`);
         modelVersions = await res.json();
+    }
+
+    async function loadMap() {
+        const L = await import("leaflet");
+        await import("leaflet/dist/leaflet.css");
+
+        if (!mapContainer || mapInstance) return;
+
+        mapInstance = L.map(mapContainer).setView([52.3, 5.3], 7);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "© OpenStreetMap contributors",
+        }).addTo(mapInstance);
+
+        const res = await fetch(`${API_BASE}/heatmap`);
+        heatmapData = await res.json();
+
+        for (const sighting of heatmapData) {
+            const marker = L.circleMarker([sighting.lat, sighting.lng], {
+                radius: 8,
+                fillColor: "#e8c84a",
+                color: "#000",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8,
+            }).addTo(mapInstance);
+
+            marker.bindPopup(`
+              <b>${sighting.text}</b><br>
+              ${sighting.country ?? "Unknown"} · ${Math.round(sighting.confidence * 100)}%<br>
+              ${sighting.location_name ?? ""}<br>
+              <small>${sighting.timestamp}</small>
+            `);
+        }
+
+        mapLoaded = true;
+    }
+
+    async function loadPlateHistory() {
+        if (!plateSearch.trim()) return;
+        const res = await fetch(
+            `${API_BASE}/plates/${plateSearch.trim().toUpperCase()}/history`,
+        );
+        plateHistory = await res.json();
+
+        if (mapInstance) {
+            const L = await import("leaflet");
+            for (const sighting of plateHistory) {
+                if (!sighting.lat || !sighting.lng) continue;
+                L.circleMarker([sighting.lat, sighting.lng], {
+                    radius: 8,
+                    fillColor: "#ef4444",
+                    color: "000",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8,
+                }).addTo(mapInstance).bindPopup(`
+                    <b>${sighting.text}</b><br>
+                    ${sighting.source} · ${Math.round(sighting.confidence * 100)}%<br>
+                    ${sighting.location_name ?? ""}<br>
+                    <small>${sighting.timestamp}</small>
+                  `);
+            }
+        }
     }
 
     async function triggerRetrain() {
@@ -170,6 +263,11 @@
         const t0 = performance.now();
         const form = new FormData();
         form.append("file", file);
+
+        if (locationLat) form.append("lat", locationLat);
+        if (locationLng) form.append("lng", locationLng);
+        if (locationName) form.append("location_name", locationName);
+
         try {
             const res = await fetch(`${API_BASE}${endpoint}`, {
                 method: "POST",
@@ -590,7 +688,81 @@
                                         ✓ {pipelineFile.name}
                                     </p>{/if}
                             </label>
+                            <div class="card pad" style="margin-bottom: 12px;">
+                                <div class="section-label mb12">
+                                    Location tag <span class="muted2 tiny"
+                                        >(optional)</span
+                                    >
+                                </div>
 
+                                <!-- Geolocation consent disclosure -->
+                                {#if !useGeolocation}
+                                    <p class="muted tiny mb12">
+                                        You can tag this sighting with a
+                                        location. If you use browser
+                                        geolocation, your coordinates will be
+                                        sent to the Spotter API and stored with
+                                        the plate record. This is optional — you
+                                        can also type a location manually.
+                                    </p>
+                                    <div
+                                        class="action-row"
+                                        style="gap: 8px; margin-bottom: 12px;"
+                                    >
+                                        <button
+                                            class="cta"
+                                            style="flex:0; padding: 10px 14px; font-size:11px;"
+                                            onclick={async () => {
+                                                await requestGeolocation();
+                                                useGeolocation = true;
+                                            }}
+                                        >
+                                            Use my location
+                                        </button>
+                                        <span class="muted tiny"
+                                            >or type manually below</span
+                                        >
+                                    </div>
+                                {:else}
+                                    <div class="row-between mb12">
+                                        <span class="muted tiny"
+                                            >📍 Using browser location</span
+                                        >
+                                        <button
+                                            class="muted tiny"
+                                            style="background:none;border:none;cursor:pointer;"
+                                            onclick={() => {
+                                                useGeolocation = false;
+                                                locationLat = "";
+                                                locationLng = "";
+                                            }}
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                {/if}
+
+                                <div class="action-row" style="gap: 8px;">
+                                    <input
+                                        class="text-input"
+                                        placeholder="Lat e.g. 52.37"
+                                        bind:value={locationLat}
+                                        style="flex:1;"
+                                    />
+                                    <input
+                                        class="text-input"
+                                        placeholder="Lng e.g. 4.89"
+                                        bind:value={locationLng}
+                                        style="flex:1;"
+                                    />
+                                    <input
+                                        class="text-input"
+                                        placeholder="Name e.g. Amsterdam A10"
+                                        bind:value={locationName}
+                                        style="flex:2;"
+                                    />
+                                </div>
+                            </div>
                             <div class="action-row">
                                 <button
                                     class="cta"
@@ -866,7 +1038,81 @@
                                     ✓ {recognizeFile.name}
                                 </p>{/if}
                         </label>
+                        <div class="card pad" style="margin-bottom: 12px;">
+                            <div class="section-label mb12">
+                                Location tag <span class="muted2 tiny"
+                                    >(optional)</span
+                                >
+                            </div>
 
+                            <!-- Geolocation consent disclosure -->
+                            {#if !useGeolocation}
+                                <p class="muted tiny mb12">
+                                    You can tag this sighting with a location.
+                                    If you use browser geolocation, your
+                                    coordinates will be sent to the Spotter API
+                                    and stored with the plate record. This is
+                                    optional — you can also type a location
+                                    manually.
+                                </p>
+                                <div
+                                    class="action-row"
+                                    style="gap: 8px; margin-bottom: 12px;"
+                                >
+                                    <button
+                                        class="cta"
+                                        style="flex:0; padding: 10px 14px; font-size:11px;"
+                                        onclick={async () => {
+                                            await requestGeolocation();
+                                            useGeolocation = true;
+                                        }}
+                                    >
+                                        Use my location
+                                    </button>
+                                    <span class="muted tiny"
+                                        >or type manually below</span
+                                    >
+                                </div>
+                            {:else}
+                                <div class="row-between mb12">
+                                    <span class="muted tiny"
+                                        >📍 Using browser location</span
+                                    >
+                                    <button
+                                        class="muted tiny"
+                                        style="background:none;border:none;cursor:pointer;"
+                                        onclick={() => {
+                                            useGeolocation = false;
+                                            locationLat = "";
+                                            locationLng = "";
+                                        }}
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                            {/if}
+
+                            <div class="action-row" style="gap: 8px;">
+                                <input
+                                    class="text-input"
+                                    placeholder="Lat e.g. 52.37"
+                                    bind:value={locationLat}
+                                    style="flex:1;"
+                                />
+                                <input
+                                    class="text-input"
+                                    placeholder="Lng e.g. 4.89"
+                                    bind:value={locationLng}
+                                    style="flex:1;"
+                                />
+                                <input
+                                    class="text-input"
+                                    placeholder="Name e.g. Amsterdam A10"
+                                    bind:value={locationName}
+                                    style="flex:2;"
+                                />
+                            </div>
+                        </div>
                         <div class="action-row">
                             <button
                                 class="cta"
@@ -2008,6 +2254,107 @@
                         {:else if watchlistResult}
                             <div class="empty">Watchlist is empty.</div>
                         {/if}
+                    {:else if activeTab === "map"}
+                        <header class="mode-head">
+                            <div class="mode-meta">
+                                <span class="mode-meta-num">MODE / 10</span>
+                                <span class="muted2 tiny">GET</span>
+                                <span class="muted tiny mono"
+                                    >/heatmap · /locations</span
+                                >
+                            </div>
+                            <h2 class="mode-title">Map</h2>
+                            <p class="mode-desc">
+                                Plate sightings plotted by location. Tag images
+                                with a location to populate the map.
+                            </p>
+                        </header>
+
+                        <button
+                            class="cta"
+                            onclick={loadMap}
+                            disabled={mapLoaded}
+                        >
+                            {mapLoaded ? "Map loaded" : "Load map"}
+                        </button>
+
+                        {#if heatmapData.length === 0 && mapLoaded}
+                            <div class="empty">
+                                No geotagged sightings yet. Add a location when
+                                running pipeline or recognize.
+                            </div>
+                        {/if}
+
+                        <!-- Map container — Leaflet renders into this div -->
+                        <div
+                            bind:this={mapContainer}
+                            style="width: 100%; height: 500px; border-radius: 4px; border: 1px solid var(--line); margin-top: 12px;"
+                        ></div>
+                        <div class="card pad" style="margin-top: 12px;">
+                            <div class="section-label mb12">Plate history</div>
+                            <div class="action-row" style="gap: 8px;">
+                                <input
+                                    class="text-input"
+                                    placeholder="Search plate e.g. 13BSRB"
+                                    bind:value={plateSearch}
+                                    style="text-transform: uppercase;"
+                                />
+                                <button
+                                    class="cta"
+                                    style="flex:0; padding:14px 16px;"
+                                    onclick={loadPlateHistory}>Search</button
+                                >
+                            </div>
+
+                            {#if plateHistory.length > 0}
+                                <div
+                                    style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;"
+                                >
+                                    {#each plateHistory as s}
+                                        <div
+                                            class="row-between"
+                                            style="border-bottom: 1px solid var(--line); padding-bottom: 8px;"
+                                        >
+                                            <div
+                                                style="display:flex; flex-direction:column; gap:2px;"
+                                            >
+                                                <span class="muted tiny"
+                                                    >{s.source} · {Math.round(
+                                                        s.confidence * 100,
+                                                    )}%</span
+                                                >
+                                                <span class="muted2 tiny"
+                                                    >{s.timestamp}</span
+                                                >
+                                            </div>
+                                            <div
+                                                style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;"
+                                            >
+                                                {#if s.location_name}
+                                                    <span class="accent tiny"
+                                                        >📍 {s.location_name}</span
+                                                    >
+                                                {:else if s.lat}
+                                                    <span class="muted tiny"
+                                                        >📍 {s.lat.toFixed(4)}, {s.lng.toFixed(
+                                                            4,
+                                                        )}</span
+                                                    >
+                                                {:else}
+                                                    <span class="muted2 tiny"
+                                                        >No location</span
+                                                    >
+                                                {/if}
+                                            </div>
+                                        </div>
+                                    {/each}
+                                </div>
+                            {:else if plateSearch && plateHistory.length === 0}
+                                <div class="empty">
+                                    No sightings found for {plateSearch.toUpperCase()}.
+                                </div>
+                            {/if}
+                        </div>
                     {/if}
                 </div>
             {/key}
@@ -2839,12 +3186,6 @@
         gap: 8px;
     }
     .col-end {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 2px;
-    }
-    .col-end-list {
         display: flex;
         flex-direction: column;
         align-items: flex-end;
