@@ -19,7 +19,8 @@
         | "webcam"
         | "history"
         | "stats"
-        | "watchlist";
+        | "watchlist"
+        | "review";
 
     interface PlateResult {
         text: string;
@@ -50,6 +51,11 @@
         { id: "history", label: "History", hint: "All spotted plates" },
         { id: "stats", label: "Stats", hint: "Analytics + heatmap" },
         { id: "watchlist", label: "Watchlist", hint: "Flag specific plates" },
+        {
+            id: "review",
+            label: "Review Queue",
+            hint: "Label low-confidence plates",
+        },
     ];
 
     const COUNTRIES: Record<string, string> = {
@@ -90,6 +96,10 @@
     let webcamResults: PlateResult[] = $state([]);
     let analyticsResult: any = $state(null);
     let frameInterval: ReturnType<typeof setInterval> | null = null;
+    let reviewQueue: any[] = $state([]);
+    let reviewInputs: Record<number, string> = $state({});
+    let reviewLoading = $state(false);
+
     let tooltip: {
         text: string;
         country: string;
@@ -272,6 +282,33 @@
     async function loadWatchlist() {
         const res = await fetch(`${API_BASE}/watchlist`);
         watchlistResult = await res.json();
+    }
+
+    async function loadReviewQueue() {
+        const res = await fetch(`${API_BASE}/queue`);
+        reviewQueue = await res.json();
+        reviewInputs = Object.fromEntries(
+            reviewQueue.map((item: any) => [item.id, ""]),
+        );
+    }
+
+    async function submitLabel(id: number) {
+        const text = reviewInputs[id];
+        if (!text.trim()) return;
+        await fetch(`${API_BASE}/queue/${id}/label`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+        });
+
+        reviewQueue = reviewQueue.filter((item: any) => item.id !== id);
+    }
+
+    async function rejectItem(id: number) {
+        await fetch(`${API_BASE}/queue/${id}/reject`, {
+            method: "POST",
+        });
+        reviewQueue = reviewQueue.filter((item: any) => item.id !== id);
     }
 
     async function addToWatchlist() {
@@ -1652,7 +1689,108 @@
                                 </div>
                             </div>
                         {/if}
+                    {:else if activeTab === "review"}
+                        <header class="mode-head">
+                            <div class="mode-meta">
+                                <span class="mode-meta-num">MODE / 09</span>
+                                <span class="muted2 tiny">GET · POST</span>
+                                <span class="muted tiny mono">/queue</span>
+                            </div>
+                            <h2 class="mode-title">Review Queue</h2>
+                            <p class="mode-desc">
+                                Label low-confidence plates to improve the
+                                model. Lowest confidence first.
+                            </p>
+                        </header>
 
+                        <div class="action-row">
+                            <button class="cta" onclick={loadReviewQueue}
+                                >Load queue</button
+                            >
+                            {#if reviewQueue.length > 0}
+                                <span class="muted tiny"
+                                    >{reviewQueue.length} pending</span
+                                >
+                            {/if}
+                        </div>
+
+                        {#if reviewQueue.length > 0}
+                            <div class="result-list" style="gap: 12px;">
+                                {#each reviewQueue as item}
+                                    <div class="card pad">
+                                        <div class="row-between mb12">
+                                            <span class="mode-meta-num"
+                                                >#{item.id}</span
+                                            >
+                                            <div
+                                                style="display:flex; gap:12px;"
+                                            >
+                                                <span class="muted tiny"
+                                                    >{item.source}</span
+                                                >
+                                                <span class="bad tiny"
+                                                    >{Math.round(
+                                                        item.confidence * 100,
+                                                    )}% conf</span
+                                                >
+                                            </div>
+                                        </div>
+
+                                        <!-- Crop image from the backend -->
+                                        <img
+                                            src="{API_BASE}/queue/{item.id}/crop"
+                                            alt="plate crop"
+                                            style="width:100%; max-height:80px; object-fit:contain; border-radius:4px; margin-bottom:12px; background:#111;"
+                                        />
+
+                                        <div class="row-between mb12">
+                                            <span class="muted tiny"
+                                                >Model predicted:</span
+                                            >
+                                            <span class="accent bold mono"
+                                                >{item.predicted_text ??
+                                                    "—"}</span
+                                            >
+                                        </div>
+
+                                        <div
+                                            class="action-row"
+                                            style="gap:8px;"
+                                        >
+                                            <input
+                                                class="text-input"
+                                                placeholder="Correct text e.g. 13BSRB"
+                                                bind:value={
+                                                    reviewInputs[item.id]
+                                                }
+                                                style="text-transform:uppercase;"
+                                            />
+                                            <button
+                                                class="cta"
+                                                style="flex:0; padding:14px 16px;"
+                                                onclick={() =>
+                                                    submitLabel(item.id)}
+                                                disabled={!reviewInputs[
+                                                    item.id
+                                                ]?.trim()}>✓</button
+                                            >
+                                            <button
+                                                class="cta"
+                                                style="flex:0; padding:14px 16px; background:rgba(239,68,68,0.1); color:var(--bad); border-color:var(--bad);"
+                                                onclick={() =>
+                                                    rejectItem(item.id)}
+                                                >✗</button
+                                            >
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        {:else if reviewQueue.length === 0 && reviewLoading === false}
+                            <div class="empty">
+                                No pending items. Run some recognitions to
+                                populate the queue.
+                            </div>
+                        {/if}
                         <!-- ─── Watchlist ───────────────────────────── -->
                     {:else if activeTab === "watchlist"}
                         <header class="mode-head">

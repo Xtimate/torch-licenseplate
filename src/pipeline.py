@@ -1,3 +1,5 @@
+import io
+
 from PIL import Image
 
 from detector import detect_from_image
@@ -25,6 +27,10 @@ def run_pipeline(
         print(f"  result: {result}")
         if result.rejected or not result.text:
             continue
+
+        buf = io.BytesIO()
+        crop.save(buf, format="JPEG", quality=90)
+        crop_bytes = buf.getvalue()
         results.append(
             {
                 "text": result.text,
@@ -36,6 +42,7 @@ def run_pipeline(
                 "x2": det["x2"],
                 "y2": det["y2"],
                 "conf": det["conf"],
+                "crop_bytes": crop_bytes,
             }
         )
     return results

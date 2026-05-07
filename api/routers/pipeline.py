@@ -51,7 +51,7 @@ async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
             predicted_text=plate["text"],
             confidence=plate.get("confidence", 0.0),
             source="pipeline",
-            crop_bytes=contents,
+            crop_bytes=plate.pop("crop_bytes", None),
         )
 
         watch = check_watchlist(plate["text"])

@@ -65,7 +65,7 @@ def insert_plate(text, country, confidence, valid_format, source, crop_bytes=Non
 
 
 def maybe_queue_for_review(
-    predicted_text, confidence, source, crop_bytes, threshold=1.0
+    predicted_text, confidence, source, crop_bytes, threshold=0.997
 ):
     if confidence >= threshold or crop_bytes is None:
         return
