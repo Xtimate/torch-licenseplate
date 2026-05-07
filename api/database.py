@@ -58,14 +58,34 @@ def init_db():
     conn.close()
 
 
-def insert_plate(text, country, confidence, valid_format, source, crop_bytes=None):
+def insert_plate(
+    text,
+    country,
+    confidence,
+    valid_format,
+    source,
+    crop_bytes=None,
+    lat=None,
+    lng=None,
+    location_name=None,
+):
     conn = get_conn()
     cur = conn.execute(
         """
-        INSERT INTO plates (text, country, confidence, valid_format, source, crop)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO plates (text, country, confidence, valid_format, source, crop, lat, lng, location_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
-        (text, country, confidence, valid_format, source, crop_bytes),
+        (
+            text,
+            country,
+            confidence,
+            valid_format,
+            source,
+            crop_bytes,
+            lat,
+            lng,
+            location_name,
+        ),
     )
     conn.commit()
     row_id = cur.lastrowid
@@ -278,6 +298,50 @@ def get_active_model_version():
     row = conn.execute("SELECT * FROM model_versions WHERE is_active = 1").fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def get_plate_sightings(text: str):
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT id, text, country, confidence, source, timestamp, lat, lng, location_name
+        FROM plates
+        WHERE text = ?
+        ORDER BY timestamp DESC
+        """,
+        (text,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_heatmap_data():
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT text, country, confidence, timestamp, lat, lng, location_name
+        FROM plates
+        WHERE lat IS NOT NULL AND lng IS NOT NULL
+        ORDER BY timestamp DESC
+        """
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_locations():
+    conn = get_conn()
+    rows = conn.execute(
+        """
+        SELECT location_name, COUNT(*) as count, AVG(lat) as lat, AVG(lng) as lng
+        FROM plates
+        WHERE location_name IS NOT NULL
+        GROUP BY location_name
+        ORDER BY count DESC
+        """
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def check_watchlist(text):

@@ -32,6 +32,7 @@ from api.database import init_db
 from api.routers import (
     detect,
     history,
+    locations,
     pipeline,
     queue,
     recognize,
@@ -87,6 +88,8 @@ app.include_router(history.router)
 app.include_router(watchlist.router)
 app.include_router(queue.router)
 app.include_router(retrain.router)
+app.include_router(locations.router)
+
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore

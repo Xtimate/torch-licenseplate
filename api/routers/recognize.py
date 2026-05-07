@@ -1,9 +1,11 @@
 import io
 import os
 import sys
+from typing import Optional
 
-from fastapi import APIRouter, File, Request, UploadFile
+from fastapi import APIRouter, File, Form, Request, UploadFile
 from PIL import Image
+from pydantic import BaseModel
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 import recognizer  # type: ignore
@@ -14,7 +16,13 @@ router = APIRouter()
 
 
 @router.post("/recognize")
-async def recognize(request: Request, file: UploadFile = File(...)):
+async def recognize(
+    request: Request,
+    file: UploadFile = File(...),
+    lat: Optional[float] = Form(default=None),
+    lng: Optional[float] = Form(default=None),
+    location_name: Optional[str] = Form(default=None),
+):
     contents = await file.read()
     image = Image.open(io.BytesIO(contents)).convert("RGB")
     result = recognizer.recognize_from_image_onnx(
@@ -31,13 +39,15 @@ async def recognize(request: Request, file: UploadFile = File(...)):
             "reason": result.rejection_reason,
         }
 
-    # Save to database
     insert_plate(
         text=result.text,
         country=result.country,
         confidence=result.confidence,
         valid_format=result.valid_format,
         source="recognize",
+        lat=lat,
+        lng=lng,
+        location_name=location_name,
     )
 
     maybe_queue_for_review(
@@ -47,7 +57,6 @@ async def recognize(request: Request, file: UploadFile = File(...)):
         crop_bytes=contents,
     )
 
-    # Check watchlist
     watch = check_watchlist(result.text)
     response = {
         "text": result.text,

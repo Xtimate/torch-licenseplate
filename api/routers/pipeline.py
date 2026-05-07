@@ -2,8 +2,9 @@ import hashlib
 import io
 import os
 import sys
+from typing import Optional
 
-from fastapi import APIRouter, File, Request, UploadFile
+from fastapi import APIRouter, File, Form, Request, UploadFile
 from PIL import Image
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -21,7 +22,13 @@ limiter = Limiter(key_func=get_remote_address)
 
 @router.post("/pipeline")
 @limiter.limit("10/minute")
-async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
+async def pipeline_endpoint(
+    request: Request,
+    file: UploadFile = File(...),
+    lat: Optional[float] = Form(default=None),
+    lng: Optional[float] = Form(default=None),
+    location_name: Optional[str] = Form(default=None),
+):
     contents = await file.read()
     image_hash = hashlib.md5(contents).hexdigest()
 
@@ -45,6 +52,9 @@ async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
             confidence=plate.get("confidence", 0.0),
             valid_format=plate.get("valid_format", False),
             source="pipeline",
+            lat=lat,
+            lng=lng,
+            location_name=location_name,
         )
 
         maybe_queue_for_review(
@@ -58,7 +68,6 @@ async def pipeline_endpoint(request: Request, file: UploadFile = File(...)):
         if watch:
             plate["watchlist_hit"] = True
             plate["watchlist_notes"] = watch.get("notes")
-
             await send_telegram_alert(
                 text=plate["text"],
                 confidence=plate.get("confidence", 0.0),
