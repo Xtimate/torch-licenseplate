@@ -115,6 +115,7 @@
     let useGeolocation = $state(false);
     let plateSearch = $state("");
     let plateHistory: any[] = $state([]);
+    let overlayCanvas: HTMLCanvasElement | null = $state(null);
 
     let tooltip: {
         text: string;
@@ -257,6 +258,35 @@
         }
     }
 
+    function drawBoxes(results: any[]) {
+        if (!overlayCanvas || !videoEl) return;
+        const ctx = overlayCanvas.getContext("2d");
+        if (!ctx) return;
+
+        overlayCanvas.width = videoEl.videoWidth;
+        overlayCanvas.height = videoEl.videoHeight;
+
+        ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+        for (const det of results) {
+            if (det.x1 == null) continue;
+
+            ctx.strokeStyle = "#e8c84a";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(det.x1, det.y1, det.x2 - det.x1, det.y2 - det.y1);
+            ctx.fillStyle = "rgba(232, 200, 74, 0.08)";
+            ctx.fillRect(det.x1, det.y1, det.x2 - det.x1, det.y2 - det.y1);
+
+            const label = `${det.text} ${Math.round(det.confidence * 100)}%`;
+            ctx.font = "bold 16px DM Mono, monospace";
+            const tw = ctx.measureText(label).width;
+            ctx.fillStyle = "#e8c84a";
+            ctx.fillRect(det.x1, det.y1 - 24, tw + 12, 24);
+            ctx.fillStyle = "#0a0a0a";
+            ctx.fillText(label, det.x1 + 6, det.y1 - 6);
+        }
+    }
+
     async function post(endpoint: string, file: File | null) {
         if (!file) return null;
         loading = true;
@@ -336,6 +366,8 @@
         ws = new WebSocket(`${WS_BASE}/webcam`);
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
+
+            drawBoxes(data);
             if (data.length > 0) {
                 for (const det of data) {
                     if (!webcamResults.find((r) => r.text === det.text)) {
@@ -1314,6 +1346,10 @@
                                     class="video-el"
                                     class:hidden={!webcamActive}
                                 ></video>
+                                <canvas
+                                    bind:this={overlayCanvas}
+                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events:none"
+                                ></canvas>
                                 {#if !webcamActive}
                                     <div class="cam-off">
                                         <div class="muted2 tiny lt">
