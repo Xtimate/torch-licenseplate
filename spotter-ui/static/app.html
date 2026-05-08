@@ -259,6 +259,138 @@
             line-height: 1;
             padding: 4px;
         }
+
+        .scan-title {
+            font-family: "Syne", sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .camera-area {
+            position: relative;
+            background: #000;
+            flex: 1;
+            overflow: hidden;
+            max-height: 55dvh;
+        }
+
+        #scan-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #scan-canvas {
+            display: none;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .finder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 75%;
+            height: 30%;
+        }
+
+        .finder-corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-color: var(--accent);
+            border-style: solid;
+            opacity: 0.8;
+        }
+
+        .finder-corner.tl {
+            top: 0;
+            left: 0;
+            border-width: 2px 0 0 2px;
+        }
+        .finder-corner.tr {
+            top: 0;
+            right: 0;
+            border-width: 2px 2px 0 0;
+        }
+        .finder-corner.bl {
+            bottom: 0;
+            left: 0;
+            border-width: 0 0 2px 2px;
+        }
+        .finder-corner.br {
+            bottom: 0;
+            right: 0;
+            border-width: 0 2px 2px 0;
+        }
+
+        .scan-hint {
+            postion: absolute;
+            bottom: 16px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .scan-controls {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .scan-result {
+            background: var(--card);
+            border: 10px solid var(--line);
+            border-radius: var(--radius);
+            padding: 16px;
+            display: none;
+        }
+
+        .scan-result.visible {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .capture-btn {
+            width: 100%;
+            padding: 18px;
+            background: var(--accent);
+            color: #0a0a0a;
+            border: none;
+            border-radius: var(--radius);
+            font-family: "Syne", sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .capture-btn:active {
+            opacity: 0.8;
+        }
+
+        .capture-btn:disabled {
+            opacity: 0.4;
+        }
     </style>
 </head>
 <body>
@@ -285,7 +417,7 @@
             </div>
 
             <div class="mode-cards">
-                <div class="mode-card" onclick="showScreen('scan')">
+                <div class="mode-card" onclick="startScan()">
                     <div class="mode-icon">📷</div>
                     <div class="mode-info">
                         <div class="mode-label">Scan</div>
@@ -337,11 +469,27 @@
             <div class="scan-controls">
                 <div class="scan-result" id="scan-result"></div>
                 <button
-                    class="capturn-btn"
+                    class="capture-btn"
                     id="capture-btn"
                     onclick="captureAndRecognize()"
                 >
                     Capture
+                </button>
+                <button
+                    onclick="testWithFile()"
+                    style="
+                        background: none;
+                        border: 1px solid var(--line);
+                        color: var(--mute);
+                        padding: 10px;
+                        border-radius: 8px;
+                        width: 100%;
+                        font-family: &quot;DM Mono&quot;, monospace;
+                        font-size: 11px;
+                        cursor: pointer;
+                    "
+                >
+                    Test with file
                 </button>
             </div>
         </div>
@@ -381,5 +529,129 @@
 
         checkApi();
         setInterval(checkApi, 30000);
+
+        let scanStream = null;
+
+        async function startScan() {
+            showScreen("scan");
+            document.getElementById("scan-result").classList.remove("visible");
+            try {
+                scanStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                });
+                document.getElementById("scan-video").srcObject = scanStream;
+            } catch {
+                alert("Camera access denied");
+                showScreen("home");
+            }
+        }
+
+        function stopScan() {
+            if (scanStream) {
+                scanStream.getTracks().forEach((t) => t.stop());
+                scanStream = null;
+            }
+        }
+
+        async function captureAndRecognize() {
+            const video = document.getElementById("scan-video");
+            const canvas = document.getElementById("scan-canvas");
+            const btn = document.getElementById("capture-btn");
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0);
+
+            btn.disabled = true;
+            btn.textContent = "Processing...";
+
+            canvas.toBlob(
+                async (blob) => {
+                    try {
+                        const form = new FormData();
+                        form.append("file", blob, "capture.jpg");
+                        const res = await fetch(`${API}/pipeline`, {
+                            method: "POST",
+                            body: form,
+                        });
+                        const data = await res.json();
+
+                        if (!Array.isArray(data) || data.length === 0) {
+                            alert("No plates detected");
+                            return;
+                        }
+
+                        showScanResult(data[0]);
+                    } catch (e) {
+                        alert("Request failed");
+                    } finally {
+                        btn.disabled = false;
+                        btn.textContent = "Capture again";
+                    }
+                },
+                "image/jpeg",
+                0.85,
+            );
+        }
+
+        function showScanResult(data) {
+            const el = document.getElementById("scan-result");
+            el.innerHTML = `
+                  <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+                      <div style="font-family:'Syne',sans-serif; font-size:24px; font-weight:800; color:var(--accent); letter-spacing:2px;">
+                          ${data.text}
+                      </div>
+                      <div style="display:flex; flex-direction:column; gap:4px;">
+                          <span style="font-size:10px; color:var(--mute);">
+                              ${Math.round(data.confidence * 100)}% confidence
+                          </span>
+                          <span style="font-size:10px; color:${data.valid_format ? "var(--good)" : "var(--bad)"};">
+                              ${data.valid_format ? "✓ Valid format" : "✗ Invalid format"}
+                          </span>
+                      </div>
+                  </div>
+                  <div style="height:3px; background:var(--line); border-radius:2px;">
+                      <div style="height:100%; width:${data.confidence * 100}%; background:var(--accent); border-radius:2px;"></div>
+                  </div>
+              `;
+            el.classList.add("visible");
+        }
+
+        function testWithFile() {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*";
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const btn = document.getElementById("capture-btn");
+                btn.disabled = true;
+                btn.textContent = "Processing...";
+                try {
+                    const form = new FormData();
+                    form.append("file", file, "plate.jpg");
+                    const res = await fetch(`${API}/pipeline`, {
+                        method: "POST",
+                        body: form,
+                    });
+                    const data = await res.json();
+                    console.log(data);
+                    if (!Array.isArray(data) || data.length === 0) {
+                        alert("No plates detected");
+                        return;
+                    }
+                    console.log(data[0]);
+                    showScanResult(data[0]);
+                } catch (e) {
+                    alert("Request failed: " + e.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Capture again";
+                }
+            };
+            input.click();
+        }
     </script>
 </body>
