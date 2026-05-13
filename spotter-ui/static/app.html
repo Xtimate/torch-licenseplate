@@ -824,7 +824,120 @@
         }
 
         async funtion startLive() {
+          try {
+            liveStream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: 'environment', width: { ideal: 1280} }
+            });
+            document.getElementById('live-video').srcObject = liveStream;
+          } catch {
+            alert('Camera access denied');
+            return;
+          }
 
+          const wsBase = API.replace('https', 'wss').replace('http', 'ws');
+          liveWs = new WebSocket('${wsBase}/webcam');
+
+          liveWs.onopen = () => {
+            liveActive = true;
+            liveResults = [];
+            document.getElementById('live-dot').style.display = 'block';
+            document.getElementById('live-status').textContent = 'Live';
+            document.getElementById('live-btn').className = 'live-btn stop';
+            document.getElementById('live-dot').textContent = 'Stop';
+
+            const video = document.getElementById('live-video');
+
+            liveInterval = setInterval(() => {
+              if (!video.videoWidth || liveWs.readyState !== WebSocket.OPEN) return;
+              const tmp = document.createElement('canvas');
+              tmp.width = video.videoWidth;
+              tmp.height = video.videoHeight;
+              tmp.getContext('2d').drawImage(video, 0, 0);
+              tmp.toBlob(blob => {
+                if (blob && liveWs.readyState === WebSocket.OPEN) liveWs.send(blob);
+              }, 'image/jpeg', 0.75);
+            }, 500);
+          };
+
+          liveWs.onmessage(e) => {
+            const data = JSON.parse(e.data);
+            drawLiveBoxes(data);
+
+            for (const det of data) {
+              if (!liveResults.find(r => r.text === det.text)) {
+                liveResults.push(det);
+                addLiveEntry(det);
+              }
+            }
+
+            document.getElementById('live-count').textContent = liveResults.length;
+          };
+
+          liveWs.onclose = () => stopLive();
+        }
+
+        function stopLive() {
+            liveActive = false;
+            if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
+            if (liveWs) { liveWs.close(); liveWs = null; }
+            if (liveStream) { liveStream.getTracks().forEach(t => t.stop()); liveStream = null; }
+
+            document.getElementById('live-dot').style.display = 'none';
+            document.getElementById('live-status').textContent = 'Offline';
+            document.getElementById('live-btn').className = 'live-btn start';
+            document.getElementById('live-btn').textContent = '▸ Start streaming';
+
+            const canvas = document.getElementById('live-canvas');
+            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+
+            showScreen('home');
+        }
+
+        function drawLiveBoxes(results) {
+            const video = document.getElementById('live-video');
+            const canvas = document.getElementById('live-canvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (const det of results) {
+                if (det.x1 == null) continue;
+                const w = det.x2 - det.x1, h = det.y2 - det.y1;
+
+                ctx.strokeStyle = '#e8c84a';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(det.x1, det.y1, w, h);
+                ctx.fillStyle = 'rgba(232,200,74,0.08)';
+                ctx.fillRect(det.x1, det.y1, w, h);
+
+                const label = `${det.text} ${Math.round(det.confidence * 100)}%`;
+                ctx.font = 'bold 14px DM Mono, monospace';
+                const tw = ctx.measureText(label).width;
+                ctx.fillStyle = '#e8c84a';
+                ctx.fillRect(det.x1, det.y1 - 22, tw + 10, 22);
+                ctx.fillStyle = '#0a0a0a';
+                ctx.fillText(label, det.x1 + 5, det.y1 - 6);
+            }
+        }
+
+        function addLiveEntry(det) {
+          const log = document.getElementById('live-log');
+          const empty = log.querySelector('.live-empty');
+          if (empty) empty.remove();
+
+          const el = document.createElement('div');
+          el.className = 'log-entry';
+          el.innerHTML = `
+                  <div class="log-entry-text">${det.text}</div>
+                  <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+                      <span style="font-size:10px; color:var(--accent);">${Math.round(det.confidence * 100)}%</span>
+                      <span style="font-size:10px; color:var(--mute);">${det.country ?? '??'}</span>
+                  </div>
+              `;
+              log.prepend(el);
+          }
         }
     </script>
 </body>
